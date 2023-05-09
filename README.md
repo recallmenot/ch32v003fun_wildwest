@@ -17,8 +17,9 @@ Nothing on here is set in stone, your code may be improved / rewritten at any ti
 this repository is supposed to be located side-by side with ch32v003fun and we will access it through a symbolic link.
 
 ## clone
-`git clone https://github.com/recallmenot/ch32v003fun.git`  
-`git clone https://github.com/recallmenot/ch32v003fun_wildwest.git`
+`git clone https://github.com/cnlohr/ch32v003fun.git`  
+`git clone https://github.com/recallmenot/ch32v003fun_wildwest.git`  
+or specify your own forks  
 
 ## symlink
 To compile and upload, we need access to the ch32v003fun directory through symbolic links.  
@@ -26,9 +27,9 @@ To compile and upload, we need access to the ch32v003fun directory through symbo
 ### linux / macos:  
 ```
 cd ch32v003fun_wildwest
-ls -s ../ch32v003fun/ch32v003fun ch32v003fun
-ls -s ../ch32v003fun/extralibs extralibs
-ls -s ../ch32v003fun/minichlink minichlink
+ln -s ../ch32v003fun/ch32v003fun ch32v003fun
+ln -s ../ch32v003fun/extralibs extralibs
+ln -s ../ch32v003fun/minichlink minichlink
 ```
 ### Windows:
 ```
