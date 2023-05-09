@@ -1,0 +1,10 @@
+.pio
+.vscode
+*.elf
+*.hex
+*.lst
+*.bin
+*.map
+ch32v003fun
+extralibs
+minichlink
