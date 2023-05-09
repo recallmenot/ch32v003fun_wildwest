@@ -21,24 +21,18 @@ this repository is supposed to be located side-by side with ch32v003fun and we w
 `git clone https://github.com/recallmenot/ch32v003fun_wildwest.git`
 
 ## symlink
-To compile and upload, we need to be able to work from within the ch32v003fun directory.  
+To compile and upload, we need access to the ch32v003fun directory through symbolic links.  
 
 ### linux / macos:  
 ```
-cd ch32v003fun
-ln -s ../ch32v003fun_wildwest/proj wildwest_proj
-ln -s ../ch32v003fun_wildwest/lib wildwest_lib
-cd ../ch32v003fun_wildwest
+cd ch32v003fun_wildwest
 ls -s ../ch32v003fun/ch32v003fun ch32v003fun
 ls -s ../ch32v003fun/extralibs extralibs
 ls -s ../ch32v003fun/minichlink minichlink
 ```
 ### Windows:
 ```
-cd ch32v003fun
-mklink /D wildwest_proj ..\ch32v003fun_wildwest\proj
-mklink /D wildwest_lib ..\ch32v003fun_wildwest\lib
-cd ..\ch32v003fun_wildwest
+cd ch32v003fun_wildwest
 mklink /D ch32v003fun ..\ch32v003fun\ch32v003fun
 mklink /D extralibs ..\ch32v003fun\extralibs
 mklink /D minichlink ..\ch32v003fun\minichlink

@@ -1,6 +1,7 @@
 # SPI nRF24L01+ demo
 This "example" consists of three parts:
 A SPI Library for the ch32v003, a platform-agnostic library for the nRF24L01(+) and the actual example.
+This is the transmitting half for [spi_24L01_rx](https://github.com/recallmenot/ch32v003fun_wildwest/tree/main/proj/spi_24L01_rx).
 
 ## SPI library
 The SPI library helps you configure the SPI registers.
@@ -14,7 +15,7 @@ I welcome any improvements you may choose to make, it's far from complete or goo
 CRC, for example, is not implemented yet and I'm incapable of making DMA easy, as the spi dac example showed the processor can be mostly "braindead" and the tiny chip can still output loads of data.
 
 ## nRF24L01(+) library
-This is the doing of [Reza Ebrahimi](https://github.com/ebrezadev), I've just included a copy of [his library](https://github.com/ebrezadev/nRF24L01-C-Driver) here and made some modifications.
+The [platform-agnostic nRF24L01 library](https://github.com/ebrezadev/nRF24L01-C-Driver) is the doing of [Reza Ebrahimi](https://github.com/ebrezadev), I've just included a copy of it here and made some modifications.
 
 ## example
 The example shows how to send either a uint8_t or a char[16].
@@ -46,20 +47,5 @@ IRQ		  | NC			|	MISO	| C7
 And then wire D4 to LED1 on the evaluation board.
 
 #### Arduino example
-As I currently only have the one ch32v003 evaluation board, I had to talk to an Arduino.
-That's why there is a dir with Arduino files lurking in here on our christian server.
-
-#### pinout for Arduino
-same perspective
-nRF     | UNO     | nRF   | UNO
---------|---------|-------|-------
-VCC		  | 3V3			|	GND		| GND
-CSN/SS	| 9				| CE		| 8
-MOSI	  | 11			| SCK		| 13
-IRQ		  | NC			| MISO	| 12
-
-And an LED on pin 4, for current-limiting resistor 1k is usually safe with 5V.
-
-## license
-Any code I provide here is use-as-you-please and contains 0 guarantees!
-No "but you have to publish source code"-deathgrip like GPL!
+As I currently only have the one ch32v003 evaluation board, I built it a "friend" to talk to.
+[TX](https://github.com/recallmenot/ch32v003fun_wildwest/tree/main/friends/Arduino/NRF24L01_TX) and [RX](https://github.com/recallmenot/ch32v003fun_wildwest/tree/main/friends/Arduino/NRF24L01_RX).
