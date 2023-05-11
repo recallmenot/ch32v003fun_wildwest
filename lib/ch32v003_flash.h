@@ -25,11 +25,102 @@ write to and read from
 */
 
 
+
+
+//update example
+//test if-defines impact
+
 /*######## library usage and configuration
 
+SELECTION:
+
+depending on your storage requirements, you have 3 options:
+	- option bytes: 16 bits / 2 bytes 
+	- main flash: n 64 byte pages (for most uses)
+	- main flash: n 1024 byte large pages
+The last two options are dictated by the size of the erase commands, which sets all bits to 1, wiping either 64 bytes or 1024 bytes at once.
+
+
+
 USAGE:
-to store variables in main flash (nonvolatile) you need to reserve it first.
-the smallest erase command we have on the CH32V003 is for 16 pages at once (1K = 2^10 bytes = 1024 bytes).
+
+in the .c file:
+before #including this library, you will need to do a few #defines:
+#define SYSTEM_CORE_CLOCK = ......
+Then select which features of this library to enable by copying the desired #defines from the "features" section below.
+Now you can #include this library.
+
+During your boot phase, call flash_set_latency() once.
+
+Read-operations (the getter functions) can be performed at any time and do not require unlocking.
+
+To "alter" is to erase / program / write.
+
+
+
+OPTION BYTES
+
+The functions with "OB" in the name concern the option bytes.
+
+To alter option bytes data1 and data0:
+1. unlock flash
+2. unlock OB
+3. write. this will internally erase them and restore all other values of the option bytes as they were before.
+4. lock
+
+
+
+MAIN FLASH: both
+
+in your Makefile, after "include ../../ch32v003fun/ch32v003fun.mk", inject your linker file:
+LDFLAGS+=-T nonvolatile.ld 
+The reason for injecting it afterwards: FLASH needs to be defined beforehand by ch32v003fun.ld
+
+For any changes to the Makefile or nonvolatile.ld to apply, running "make clean" before "make" may be necessary.
+
+
+
+MAIN FLASH: 64 byte pages
+
+The fast erase command wipes one page (64 bytes) at once.
+
+To store variables in main flash (nonvolatile) you need to reserve space first.
+nonvolatile storage needs to be
+	aligned to 64 bytes
+	a whole multiple of 64 bytes
+
+in nonvolatile.ld, we define the .nonvolatile section:
+SECTIONS
+{
+	.nonvolatile : {
+		. = ALIGN(64);
+		_reserved_nv_start = .;
+		KEEP(*(.nonvolatile));
+		. += (64 * n);
+		_reserved_nv_end = .;
+	} >FLASH AT>FLASH
+}
+"KEEP" tells gcc to really allocate the space, despite calling gcc with -Wl,--gc-sections, which will remove any flash allocations it thinks are "unused"
+
+then, still in the .ld we pass the start and end addresses to the .c file
+PROVIDE(_reserved_nv_start = _reserved_nv_start);
+PROVIDE(_reserved_nv_end = _reserved_nv_end);
+
+to alter main flash:
+1. unlock flash
+2. unlock fast programming mode for 64 page erase
+3. erase 64 byte page(s) to be written to (sadly we can't erase any smaller)
+4. lock fast programming mode
+5. program all desired values to the page(s)
+6. lock
+
+
+
+MAIN FLASH: 1024 byte large pages
+
+The standard erase command wipes 16 pages at once (1K = 2^10 bytes = 1024 bytes).
+
+To store variables in main flash (nonvolatile) you need to reserve space first.
 nonvolatile storage needs to be
 	aligned to 1K
 	a whole multiple of 1K
@@ -41,7 +132,7 @@ SECTIONS
 		. = ALIGN(1K);
 		_reserved_nv_start = .;
 		KEEP(*(.nonvolatile));
-		. += (1K * 1);
+		. += (1K * n);
 		_reserved_nv_end = .;
 	} >FLASH AT>FLASH
 }
@@ -51,35 +142,12 @@ then, still in the .ld we pass the start and end addresses to the .c file
 PROVIDE(_reserved_nv_start = _reserved_nv_start);
 PROVIDE(_reserved_nv_end = _reserved_nv_end);
 
-in your Makefile, after "include ../../ch32v003fun/ch32v003fun.mk", inject your linker file:
-LDFLAGS+=-T nonvolatile.ld 
-The reason for injecting it afterwards: FLASH needs to be defined beforehand by ch32v003fun.ld
-
-For any changes to the Makefile or nonvolatile.ld to apply, running "make clean" before "make" may be necessary.
-
-in the .c file:
-before #including this library, you will need to do a few #defines:
-#define SYSTEM_CORE_CLOCK = ......
-Then select which features of this library to enable by copying the desired #defines from the "features" section below.
-Now you can #include this library.
-
-During your boot phase, call flash_set_latency() once.
-
-Functions without "OB" in the name concern main flash.
-"alter" is erase / program / write
-Read-operations (the getter functions) can be performed at any time and do not require unlocking.
-
-To alter main flash:
+to alter main flash:
 1. unlock flash
-2. erase the 1K-page(s) to be written to (sadly we can't erase any smaller)
-3. program all desired values to the page(s)
-4. lock
-
-To alter option bytes data1 and data0:
-1. unlock flash
-2. unlock OB
-3. write. this will internally erase them and restore all other values of the option bytes as they were before.
-4. lock
+3. erase 1024 byte large page(s) to be written to
+4. lock fast programming mode
+5. program all desired values to the page(s)
+6. lock
 
 
 
@@ -116,11 +184,11 @@ For storing variables in main flash the address can be calculated like this:
 address of byte nonvolatile[n] = FLASH_BASE + N_BYTES + [n];
 where n is the offset from the start of your reserved nonvolatile storage
 example:
-nonvolatile[15] = 0x08000000 + 16320 + 1 + 15
+nonvolatile[15] = 0x08000000 + _reserved_nv_start + 15
 
-flash_calcualte_nonvolatile_addr(n) does exactly that
-suggestion: calculate all non-volatile storage adresses at beginning of main and store them in variables
-better suggestion: use the FLASH_PRECALCULATE_NONVOLATILE_ADDR(n) preprocessor macro #defining your addresses, this way the math will be done at compile time
+The flash_calcualte_nonvolatile_addr(n) function and FLASH_PRECALCULATE_NONVOLATILE_ADDR(n) preprocessor macro do exactly that.
+We recommend using the macro to #define the addresses of the variables you want to store at compile time.
+This way, that math stays off the MCU.
 */
 
 
@@ -149,17 +217,22 @@ static inline void flash_set_latency();
 
 // unlock flash altering
 static inline void flash_unlock();
+// unlock fast programming mode for 64byte erase
+static inline void flash_fastp_unlock();
 #if defined(FLASH_ENABLE_OB)
 // unlock option bytes altering, additionally
 static inline void flash_OB_unlock();
 #endif
 // lock flash when you're done
 static inline void flash_lock();
+// lock fast programming mode
+static inline void flash_fastp_lock();
 
 #if defined(FLASH_ENABLE_MAIN)
 // erase a page (sorry, smaller erases impossible on CH32V003!)
 // x -> 1
 static inline void flash_erase_1K(uint32_t start_addr);
+static inline void flash_erase_64b(uint32_t start_addr);
 
 // program 2 bytes at once
 // 1 -> 0
@@ -282,6 +355,11 @@ static inline void flash_unlock() {
 	FLASH->KEYR = FLASH_KEY1;
 	FLASH->KEYR = FLASH_KEY2;
 }
+
+static inline void flash_fastp_unlock() {
+	FLASH->MODEKEYR = FLASH_KEY1;
+	FLASH->MODEKEYR = FLASH_KEY2;
+}
 #if defined(FLASH_ENABLE_OB)
 static inline void flash_OB_unlock() {
 	FLASH->OBKEYR = FLASH_KEY1;
@@ -290,6 +368,9 @@ static inline void flash_OB_unlock() {
 #endif
 static inline void flash_lock() {
 	FLASH->CTLR |= FLASH_CTLR_LOCK;
+}
+static inline void flash_fastp_lock() {
+	FLASH->CTLR |= CR_FLOCK_Set;
 }
 
 #if defined(FLASH_ENABLE_MAIN)
@@ -304,6 +385,18 @@ static inline void flash_erase_1K(uint32_t start_addr) {
 	FLASH->CTLR |= CR_STRT_Set;
 	flash_wait_until_not_busy();
 	FLASH->CTLR &= CR_PER_Reset;
+}
+
+static inline void flash_erase_64b(uint32_t start_addr) {
+	if(FLASH->CTLR & (FLASH_CTLR_LOCK | FLASH_CTLR_FLOCK)) {
+		return;
+	}
+	flash_wait_until_not_busy();
+	FLASH->CTLR |= CR_PAGE_ER;
+	FLASH->ADDR = start_addr; 
+	FLASH->CTLR |= CR_STRT_Set;
+	flash_wait_until_not_busy();
+	FLASH->CTLR &= ~CR_PAGE_ER;
 }
 
 // 1 -> 0
