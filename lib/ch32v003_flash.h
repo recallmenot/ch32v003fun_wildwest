@@ -26,10 +26,6 @@ write to and read from
 
 
 
-
-//update example
-//test if-defines impact
-
 /*######## library usage and configuration
 
 SELECTION:
@@ -45,16 +41,15 @@ The last two options are dictated by the size of the erase commands, which sets 
 USAGE:
 
 in the .c file:
-before #including this library, you will need to do a few #defines:
+before #including this library, you will need to do a define:
 #define SYSTEM_CORE_CLOCK = ......
-Then select which features of this library to enable by copying the desired #defines from the "features" section below.
 Now you can #include this library.
 
 During your boot phase, call flash_set_latency() once.
 
 Read-operations (the getter functions) can be performed at any time and do not require unlocking.
 
-To "alter" is to erase / program / write.
+To "alter" means to erase / program / write.
 
 
 
@@ -192,25 +187,10 @@ This way, that math stays off the MCU.
 */
 
 
-/*######## features: use your desired before #including this library!
-
-#define FLASH_ENABLE_MAIN
-#define FLASH_ENABLE_HELPER_ADDR
-#define FLASH_ENABLE_HELPER_8
-#define FLASH_ENABLE_HELPER_FLOAT
-
-#define FLASH_ENABLE_OB
-#define FLASH_ENABLE_HELPER_OB_8
-#define FLASH_ENABLE_HELPER_OB_GETTERS
-*/
-
-
 //######## function overview (declarations): use these!
 
-#if defined(FLASH_ENABLE_HELPER_ADDR)
 // calculate address at runtime, you can use compile-time addresses instead!
 uint32_t flash_calcualte_nonvolatile_addr(uint16_t byte_number);
-#endif
 
 // set the flash controller latency in accordance with the SYSTEM_CORE_CLOCK speed
 static inline void flash_set_latency();
@@ -219,16 +199,13 @@ static inline void flash_set_latency();
 static inline void flash_unlock();
 // unlock fast programming mode for 64byte erase
 static inline void flash_fastp_unlock();
-#if defined(FLASH_ENABLE_OB)
 // unlock option bytes altering, additionally
 static inline void flash_OB_unlock();
-#endif
 // lock flash when you're done
 static inline void flash_lock();
 // lock fast programming mode
 static inline void flash_fastp_lock();
 
-#if defined(FLASH_ENABLE_MAIN)
 // erase a page (sorry, smaller erases impossible on CH32V003!)
 // x -> 1
 static inline void flash_erase_1K(uint32_t start_addr);
@@ -238,17 +215,11 @@ static inline void flash_erase_64b(uint32_t start_addr);
 // 1 -> 0
 static inline void flash_program_16(uint32_t addr, uint16_t data);
 static inline uint16_t flash_get_16(uint32_t addr);
-#endif
-#if defined(FLASH_ENABLE_HELPER_8)
 static inline void flash_program_2x8(uint32_t addr, uint8_t byte1, uint8_t byte0);
 static inline uint8_t flash_get_8(uint32_t addr);
-#endif
-#if defined(FLASH_ENABLE_HELPER_FLOAT)
 static inline void flash_program_float(uint32_t addr, float value);
 static inline float flash_get_float(uint32_t addr);
-#endif
 
-#if defined(FLASH_ENABLE_OB)
 // write data to option bytes, keeping other contents intact
 // 		= backup + erase + write (restoring backup)
 static inline void flash_OB_write_data_16(uint16_t data);
@@ -256,19 +227,14 @@ static inline void flash_OB_write_data_16(uint16_t data);
 static inline uint8_t flash_OB_get_DATA1();
 static inline uint8_t flash_OB_get_DATA0();
 static inline uint16_t flash_OB_get_DATA_16();
-#endif
 
-#if defined(FLASH_ENABLE_HELPER_OB_8)
 static inline void flash_OB_write_data_2x8(uint8_t data1, uint8_t data0);
-#endif
 
-#if defined(FLASH_ENABLE_HELPER_OB_GETTERS)
 // read option bytes
 static inline uint8_t flash_OB_get_USER();
 static inline uint8_t flash_OB_get_RDPR();
 static inline uint8_t flash_OB_get_WRPR1();
 static inline uint8_t flash_OB_get_WRPR0();
-#endif
 
 
 
@@ -286,13 +252,11 @@ static inline void flash_is_done_clear();
 static inline void flash_wait_until_not_busy();
 //static inline void flash_wait_until_done();
 
-#if defined(FLASH_ENABLE_OB)
 // test that first 8 bits are the inverse of the last 8 bits
 static inline uint8_t flash_dechecksum(uint16_t input);
 
 // erase option byte
 static inline void flash_OB_erase();
-#endif
 
 
 
@@ -301,12 +265,10 @@ static inline void flash_OB_erase();
 extern char _reserved_nv_start[]; 
 extern char _reserved_nv_end[]; 
 
-#if defined(FLASH_ENABLE_HELPER_FLOAT)
 union float_2xuint16t {
 	float f;
 	uint16_t u16[2];
 };
-#endif
 
 //######## preprocessor macros
 
@@ -324,24 +286,14 @@ union float_2xuint16t {
 #error "SYSTEM_CORE_CLOCK is not defined. Please define it in your .c before you #include ch32v003_flash.h."
 #endif
 
-#if !defined(FLASH_ENABLE_MAIN) && !defined(FLASH_ENABLE_OB)
-#error "neither 'FLASH_ENABLE_MAIN', nor 'FLASH_ENABLE_OB' were #defined, please look at the sections 'library configuration and usage' and 'features'"
-#endif
-
-#if defined(FLASH_ENABLE_MAIN) && defined(FLASH_ENABLE_OB)
-#warning "both 'FLASH_ENABLE_MAIN' and 'FLASH_ENABLE_OB' were #defined, is this intentional?"
-#endif
-
 
 
 //######## small function definitions, static inline
 
-#if defined(FLASH_ENABLE_HELPER_ADDR)
 uint32_t flash_calcualte_nonvolatile_addr(uint16_t byte_number) {
 	//if (byte_number < FLASH_VOLATILE_CAPACITY) {}
 	return (FLASH_BASE + ((uint16_t)(uintptr_t)_reserved_nv_start + byte_number));
 }
-#endif
 
 static inline void flash_set_latency() {
 	#if SYSTEM_CORE_CLOCK <= 24000000
@@ -360,12 +312,10 @@ static inline void flash_fastp_unlock() {
 	FLASH->MODEKEYR = FLASH_KEY1;
 	FLASH->MODEKEYR = FLASH_KEY2;
 }
-#if defined(FLASH_ENABLE_OB)
 static inline void flash_OB_unlock() {
 	FLASH->OBKEYR = FLASH_KEY1;
 	FLASH->OBKEYR = FLASH_KEY2;
 }
-#endif
 static inline void flash_lock() {
 	FLASH->CTLR |= FLASH_CTLR_LOCK;
 }
@@ -373,7 +323,6 @@ static inline void flash_fastp_lock() {
 	FLASH->CTLR |= CR_FLOCK_Set;
 }
 
-#if defined(FLASH_ENABLE_MAIN)
 // x -> 1
 static inline void flash_erase_1K(uint32_t start_addr) {
 	if(FLASH->CTLR & FLASH_CTLR_LOCK) {
@@ -416,18 +365,14 @@ static inline void flash_program_16(uint32_t addr, uint16_t data) {
 static inline uint16_t flash_get_16(uint32_t addr) {
 	return *(uint16_t*)(uintptr_t)addr;
 }
-#endif
 
-#if defined(FLASH_ENABLE_HELPER_8)
 static inline void flash_program_2x8(uint32_t addr, uint8_t byte1, uint8_t byte0) {
 	flash_program_16(addr, (byte1<<8)+byte0);
 }
 static inline uint8_t flash_get_8(uint32_t addr) {
 	return *(uint8_t*)(uintptr_t)addr;
 }
-#endif
 
-#if defined(FLASH_ENABLE_HELPER_FLOAT)
 static inline void flash_program_float(uint32_t addr, float value) {
 	union float_2xuint16t conv;
 	conv.f = value;
@@ -440,9 +385,7 @@ static inline float flash_get_float(uint32_t addr) {
 	conv.u16[1] = ((uint16_t*)(uintptr_t)addr)[1];
 	return conv.f;
 }
-#endif
 
-#if defined(FLASH_ENABLE_OB)
 // 1 -> 0
 // is inlining still ok?
 //		big
@@ -493,15 +436,11 @@ static inline uint8_t flash_OB_get_DATA0() {
 static inline uint16_t flash_OB_get_DATA_16() {
 	return (flash_OB_get_DATA1()<<8)+flash_OB_get_DATA0();
 }
-#endif
 
-#if defined(FLASH_ENABLE_HELPER_OB_8)
 static inline void flash_OB_write_data_2x8(uint8_t data1, uint8_t data0) {
 	flash_OB_write_data_16((data1<<8)+data0);
 }
-#endif
 
-#if defined(FLASH_ENABLE_HELPER_OB_GETTERS)
 static inline uint8_t flash_OB_get_USER() {
 	return flash_dechecksum(OB->USER);
 }
@@ -514,7 +453,6 @@ static inline uint8_t flash_OB_get_WRPR1() {
 static inline uint8_t flash_OB_get_WRPR0() {
 	return flash_dechecksum(OB->WRPR0);
 }
-#endif
 
 
 
@@ -543,7 +481,6 @@ static inline void flash_wait_until_done() {
 }
 */
 
-#if defined(FLASH_ENABLE_OB)
 static inline uint8_t flash_dechecksum(uint16_t input) {
 	uint8_t noninverted = input & 0b11111111;
 	uint8_t deinverted = ~(input>>8);
@@ -562,7 +499,6 @@ static inline void flash_OB_erase() {
 	flash_wait_until_not_busy();
 	FLASH->CTLR &= CR_OPTER_Reset;
 }
-#endif
 
 
 //######## implementation block

@@ -37,8 +37,6 @@
 
 #include <stdio.h>
 
-#define FLASH_ENABLE_OB
-#define FLASH_ENABLE_HELPER_OB_GETTERS
 #include "../../lib/ch32v003_flash.h"
 
 

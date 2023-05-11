@@ -1,7 +1,7 @@
 // comment / uncomment to toggle compile-time address calculations
 #define CT_ADDR
 // enable (1) / disable (0) everything serial to observe actual flash usage of the flash library
-#define DBG_LVL 0
+#define DBG_LVL 1
 
 
 
@@ -26,10 +26,6 @@
 #include "../../ch32v003fun/ch32v003fun.h"
 #include <stdio.h>
 
-#define FLASH_ENABLE_MAIN
-#if !defined(CT_ADDR)
-#define FLASH_ENABLE_HELPER_ADDR
-#endif
 #include "../../lib/ch32v003_flash.h"
 
 
@@ -108,7 +104,6 @@ int main()
 		flash_lock();
 		LOG("memory locked\r\n");
 		write_counter++;
-		LOG("\r\n");
 	}
 	LOG("\r\nENOUGH WRITES FOR TODAY\r\n\r\n");
 	while(1) {
