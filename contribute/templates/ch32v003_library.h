@@ -16,12 +16,16 @@
 */
 
 
-
 /*######## library usage and configuration
 
 
 */
 
+
+/*######## features: use your desired before #including this library!
+
+#define LIBRARY_ENABLE_FEATURE
+*/
 
 
 //######## function overview (declarations): use these!

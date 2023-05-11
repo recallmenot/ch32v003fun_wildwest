@@ -1,10 +1,17 @@
+//#define DEBUG_16b			// uncomment / comment to switch between 16b and 8b debug functions
+
+
+
 // Could be defined here, or in the processor defines.
-#include <stdint.h>
 #define SYSTEM_CORE_CLOCK 48000000
 #define APB_CLOCK SYSTEM_CORE_CLOCK
 
 #include "../../ch32v003fun/ch32v003fun.h"
+
 #include <stdio.h>
+
+#define FLASH_ENABLE_OB
+#define FLASH_ENABLE_HELPER_OB_GETTERS
 #include "../../lib/ch32v003_flash.h"
 
 
@@ -15,6 +22,7 @@ uint16_t count;
 
 //######### debug fn
 
+#if defined (DEBUG_16b)
 void uint16_to_binary_string(uint16_t value, char* output, int len) {
 	for (int i = 0; i < len; i++) {
 			output[len - i - 1] = (value & 1) ? '1' : '0';
@@ -22,7 +30,20 @@ void uint16_to_binary_string(uint16_t value, char* output, int len) {
 	}
 	output[len] = '\0';
 }
-
+void print_reg(char* name, uint16_t val) {
+	char str[17];
+	uint16_to_binary_string(val, str, 16);
+	printf("   %s register: %s\n\r", name, str);
+}
+void print_debug() {
+	print_reg("OB USER ", OB->USER);
+	print_reg("OB RDPR ", OB->RDPR);
+	print_reg("OB WRPR1", OB->WRPR1);
+	print_reg("OB WRPR0", OB->WRPR1);
+	print_reg("OB DATA1", OB->Data1);
+	print_reg("OB DATA0", OB->Data0);
+}
+#else
 void uint8_to_binary_string(uint8_t value, char* output, int len) {
 	for (int i = 0; i < len; i++) {
 			output[len - i - 1] = (value & 1) ? '1' : '0';
@@ -30,36 +51,20 @@ void uint8_to_binary_string(uint8_t value, char* output, int len) {
 	}
 	output[len] = '\0';
 }
-
-void print_reg_8(char* name, uint8_t val) {
+void print_reg(char* name, uint8_t val) {
 	char str[9];
 	uint8_to_binary_string(val, str, 8);
 	printf("   %s register: %s\n\r", name, str);
 }
-
-void print_reg_16(char* name, uint16_t val) {
-	char str[17];
-	uint16_to_binary_string(val, str, 16);
-	printf("   %s register: %s\n\r", name, str);
+void print_debug() {
+	print_reg("OB USER ", flash_OB_get_USER());
+	print_reg("OB RDPR ", flash_OB_get_RDPR());
+	print_reg("OB WRPR1", flash_OB_get_WRPR1());
+	print_reg("OB WRPR0", flash_OB_get_WRPR0());
+	print_reg("OB DATA1", flash_OB_get_DATA1());
+	print_reg("OB DATA0", flash_OB_get_DATA0());
 }
-
-void print_debug_8() {
-	print_reg_8("OB USER ", flash_OB_get_USER());
-	print_reg_8("OB RDPR ", flash_OB_get_RDPR());
-	print_reg_8("OB WRPR1", flash_OB_get_WRPR1());
-	print_reg_8("OB WRPR0", flash_OB_get_WRPR0());
-	print_reg_8("OB DATA1", flash_OB_get_DATA1());
-	print_reg_8("OB DATA0", flash_OB_get_DATA0());
-}
-
-void print_debug_16() {
-	print_reg_16("OB USER ", OB->USER);
-	print_reg_16("OB RDPR ", OB->RDPR);
-	print_reg_16("OB WRPR1", OB->WRPR1);
-	print_reg_16("OB WRPR0", OB->WRPR1);
-	print_reg_16("OB DATA1", OB->Data1);
-	print_reg_16("OB DATA0", OB->Data0);
-}
+#endif
 
 
 
@@ -82,10 +87,12 @@ int main()
 
 	flash_set_latency();
 
-	while(1)
+	uint8_t write_counter = 0;
+
+	while(write_counter < 4)
 	{
 		GPIOD->BSHR = (1<<(16+4)); // LED on
-		print_debug_8();
+		print_debug();
 		count = flash_OB_get_DATA_16();
 		printf("   memory contained value %u\r\n", count);
 		Delay_Ms(250);
@@ -100,5 +107,12 @@ int main()
 		printf("memory written\r\n");
 		flash_lock();
 		printf("memory locked\r\n");
+	}
+	printf("\r\nENOUGH WRITES FOR TODAY\r\n\r\n");
+	while(1) {
+		GPIOD->BSHR = (1<<(16+4)); // LED on
+		Delay_Ms(1000);
+		GPIOD->BSHR = (1<<4); // LED off
+		Delay_Ms(1000);
 	}
 }
