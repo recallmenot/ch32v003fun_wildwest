@@ -7,9 +7,9 @@ This is the right place for you if you:
  * want to learn
  * want to contribute
  * don't have two degrees and a doctorate in embedded engineering
- * want to experiment with something outside of core functionality
+ * want to experiment with ideas outside of core functionality
 
-**wildwest** because commit access will be handed out to anyone who asks, so all of us have to make it work by acting in good faith.
+**wildwest** because collaborator status will be granted to anyone who asks in the ch32v003fun Discord, so all of us have to make it work by acting in good faith.
 
 Nothing on here is set in stone, your code may be improved / rewritten at any time.
 
