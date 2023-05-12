@@ -1,10 +1,42 @@
+// disable (0) / enable (8) / enable (16) everything serial to observe actual flash usage of the flash library
+#define DBG_BITS 8
+
+
+
+#if DBG_BITS > 0
+	#define LOG(X) printf(X)
+	#define LOG32(X) printf("%s: %lu\r\n", #X, X)
+	#define LOG32char(X) printf("%s: %lu\r\n", #X, (uint32_t)(uintptr_t)X)
+	#define LOG16(X) printf("%s: %u\r\n", #X, X)
+	#define LOGregister(X) printf("register: %s contains %s\n\r", #X, bits)
+	#if DBG_BITS == 16
+		#define INIT_register_str char bits[17]
+		#define CNVregister(X) uint16_to_binary_string(X, bits, 16)
+	#elif DBG_BITS == 8
+		#define INIT_register_str char bits[9]
+		#define CNVregister(X) uint8_to_binary_string(X, bits, 8)
+	#endif
+#else
+	#define LOG(X)			// will get replaced to empty line
+	#define LOG32(X)
+	#define LOG32char(X)
+	#define LOG16(X)
+	#define LOGregister(X)
+	#define CNVregister(X)
+	#define INIT_register_str 
+	#define CNVregister(X)
+#endif
+
+
+
 // Could be defined here, or in the processor defines.
-#include <stdint.h>
 #define SYSTEM_CORE_CLOCK 48000000
 #define APB_CLOCK SYSTEM_CORE_CLOCK
 
 #include "../../ch32v003fun/ch32v003fun.h"
+
 #include <stdio.h>
+
 #include "../../lib/ch32v003_flash.h"
 
 
@@ -22,7 +54,6 @@ void uint16_to_binary_string(uint16_t value, char* output, int len) {
 	}
 	output[len] = '\0';
 }
-
 void uint8_to_binary_string(uint8_t value, char* output, int len) {
 	for (int i = 0; i < len; i++) {
 			output[len - i - 1] = (value & 1) ? '1' : '0';
@@ -31,35 +62,39 @@ void uint8_to_binary_string(uint8_t value, char* output, int len) {
 	output[len] = '\0';
 }
 
-void print_reg_8(char* name, uint8_t val) {
-	char str[9];
-	uint8_to_binary_string(val, str, 8);
-	printf("   %s register: %s\n\r", name, str);
+#if DBG_BITS == 8
+void print_debug() {
+	INIT_register_str;
+	CNVregister(flash_OB_get_USER());
+	LOGregister(OB->USER);
+	CNVregister(flash_OB_get_RDPR());
+	LOGregister(OB->RDPR);
+	CNVregister(flash_OB_get_WRPR1());
+	LOGregister(OB->WRPR1);
+	CNVregister(flash_OB_get_WRPR0());
+	LOGregister(OB->WRPR0);
+	CNVregister(flash_OB_get_DATA1());
+	LOGregister(OB->Data1);
+	CNVregister(flash_OB_get_DATA0());
+	LOGregister(OB->Data0);
 }
-
-void print_reg_16(char* name, uint16_t val) {
-	char str[17];
-	uint16_to_binary_string(val, str, 16);
-	printf("   %s register: %s\n\r", name, str);
+#elif DBG_BITS == 16
+void print_debug() {
+	INIT_register_str;
+	CNVregister(OB->USER);
+	LOGregister(OB->USER);
+	CNVregister(OB->RDPR);
+	LOGregister(OB->RDPR);
+	CNVregister(OB->WRPR1);
+	LOGregister(OB->WRPR1);
+	CNVregister(OB->WRPR0);
+	LOGregister(OB->WRPR0);
+	CNVregister(OB->Data1);
+	LOGregister(OB->Data1);
+	CNVregister(OB->Data0);
+	LOGregister(OB->Data0);
 }
-
-void print_debug_8() {
-	print_reg_8("OB USER ", flash_OB_get_USER());
-	print_reg_8("OB RDPR ", flash_OB_get_RDPR());
-	print_reg_8("OB WRPR1", flash_OB_get_WRPR1());
-	print_reg_8("OB WRPR0", flash_OB_get_WRPR0());
-	print_reg_8("OB DATA1", flash_OB_get_DATA1());
-	print_reg_8("OB DATA0", flash_OB_get_DATA0());
-}
-
-void print_debug_16() {
-	print_reg_16("OB USER ", OB->USER);
-	print_reg_16("OB RDPR ", OB->RDPR);
-	print_reg_16("OB WRPR1", OB->WRPR1);
-	print_reg_16("OB WRPR0", OB->WRPR1);
-	print_reg_16("OB DATA1", OB->Data1);
-	print_reg_16("OB DATA0", OB->Data0);
-}
+#endif
 
 
 
@@ -68,11 +103,13 @@ void print_debug_16() {
 int main()
 {
 	SystemInit48HSI();
+	#if DBG_BITS > 0
 	SetupUART( UART_BRR );
+	#endif
 
 	Delay_Ms(5000);
 
-	printf("\r\nnonvolatile storage testing: option bytes\r\n");
+	LOG("\r\nnonvolatile storage testing: option bytes\r\n");
 	// Enable GPIOs
 	RCC->APB2PCENR |= RCC_APB2Periph_GPIOD;
 
@@ -82,23 +119,35 @@ int main()
 
 	flash_set_latency();
 
-	while(1)
+	uint8_t write_counter = 0;
+
+	while(write_counter < 4)
 	{
 		GPIOD->BSHR = (1<<(16+4)); // LED on
-		print_debug_8();
+		#if DBG_BITS > 0
+		print_debug();
+		#endif
 		count = flash_OB_get_DATA_16();
-		printf("   memory contained value %u\r\n", count);
-		Delay_Ms(250);
+		LOG16(count);
+		Delay_Ms(100);
 		GPIOD->BSHR = (1<<4); // LED off
-		Delay_Ms(9750);
+		Delay_Ms(2400);
 
 		count--;
 		flash_unlock();
 		flash_OB_unlock();
-		printf("memory unlocked\r\n");
+		LOG("memory unlocked\r\n");
 		flash_OB_write_data_16(count);
-		printf("memory written\r\n");
+		LOG("memory written\r\n");
 		flash_lock();
-		printf("memory locked\r\n");
+		LOG("memory locked\r\n");
+		write_counter++;
+	}
+	LOG("\r\nENOUGH WRITES FOR TODAY\r\n\r\n");
+	while(1) {
+		GPIOD->BSHR = (1<<(16+4)); // LED on
+		Delay_Ms(1000);
+		GPIOD->BSHR = (1<<4); // LED off
+		Delay_Ms(1000);
 	}
 }

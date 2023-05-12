@@ -10,21 +10,7 @@
 
 
 
-/*######## library usage and configuration
-HARDWARE:
-Integrated flash has limited write cycles (10K as per datasheet) and will thus wear out quickly if you're not very careful!!
-For frequent writes use external flash chips, they are far more robust!
-CH32V003 has 16K =
-	16 * 2^10 bytes
-	16384 bytes
-	0x08003FFF-0x08000000+1
-	256 pages * 64 bytes
-erase	= turn all bits into 1
-program = turn the desired bits into 0, always 2 bytes at a time
-write	= erase + program
-
-
-
+/*######## library description
 MAIN GOAL
 ability to
 	store settings in flash (non-volatile)
@@ -36,33 +22,40 @@ write to and read from
 		reserved page(s) at the end (64 bytes)
 	option bytes data1 and data0
 		for some applications 16 bits are enough
+*/
+
+
+
+/*######## library usage and configuration
+
+SELECTION:
+
+depending on your storage requirements, you have 3 options:
+	- option bytes: 16 bits / 2 bytes 
+	- main flash: n 64 byte pages (for most uses)
+	- main flash: n 1024 byte large pages
+The last two options are dictated by the size of the erase commands, which sets all bits to 1, wiping either 64 bytes or 1024 bytes at once.
 
 
 
 USAGE:
-to store variables in main flash you need to reserve 1 page or more at the end of main flash for storing non-volatile variables:
 
-in overrides.ld
-PROVIDE(FLASH_LENGTH_OVERRIDE = N_BYTES);
-BYTES = 16 * 2^10 - 64 * pages
-example, reserve 1 page:
-PROVIDE(FLASH_LENGTH_OVERRIDE = 16320);
+in the .c file:
+before #including this library, you will need to do a define:
+#define SYSTEM_CORE_CLOCK = ......
+Now you can #include this library.
 
-in your Makefile, before "include ../../ch32v003fun/ch32v003fun.mk", inject your linker file:
-LDFLAGS+=-T overrides.ld 
-
-#define SYSTEM_CORE_CLOCK with a value before #including this library 
 During your boot phase, call flash_set_latency() once.
 
-Functions without "OB" in the name concern the main flash.
-"alter" is erase / program / write
 Read-operations (the getter functions) can be performed at any time and do not require unlocking.
 
-To alter main flash:
-1. unlock flash
-2. erase page(s) (sadly we can't erase any smaller)
-3. program all desired values to the pages
-4. lock
+To "alter" means to erase / program / write.
+
+
+
+OPTION BYTES
+
+The functions with "OB" in the name concern the option bytes.
 
 To alter option bytes data1 and data0:
 1. unlock flash
@@ -72,12 +65,105 @@ To alter option bytes data1 and data0:
 
 
 
+MAIN FLASH: both
+
+in your Makefile, after "include ../../ch32v003fun/ch32v003fun.mk", inject your linker file:
+LDFLAGS+=-T nonvolatile.ld 
+The reason for injecting it afterwards: FLASH needs to be defined beforehand by ch32v003fun.ld
+
+For any changes to the Makefile or nonvolatile.ld to apply, running "make clean" before "make" may be necessary.
+
+
+
+MAIN FLASH: 64 byte pages
+
+The fast erase command wipes one page (64 bytes) at once.
+
+To store variables in main flash (nonvolatile) you need to reserve space first.
+nonvolatile storage needs to be
+	aligned to 64 bytes
+	a whole multiple of 64 bytes
+
+in nonvolatile.ld, we define the .nonvolatile section:
+SECTIONS
+{
+	.nonvolatile : {
+		. = ALIGN(64);
+		_reserved_nv_start = .;
+		KEEP(*(.nonvolatile));
+		. += (64 * n);
+		_reserved_nv_end = .;
+	} >FLASH AT>FLASH
+}
+"KEEP" tells gcc to really allocate the space, despite calling gcc with -Wl,--gc-sections, which will remove any flash allocations it thinks are "unused"
+
+then, still in the .ld we pass the start and end addresses to the .c file
+PROVIDE(_reserved_nv_start = _reserved_nv_start);
+PROVIDE(_reserved_nv_end = _reserved_nv_end);
+
+to alter main flash:
+1. unlock flash
+2. unlock fast programming mode for 64 page erase
+3. erase 64 byte page(s) to be written to (sadly we can't erase any smaller)
+4. lock fast programming mode
+5. program all desired values to the page(s)
+6. lock
+
+
+
+MAIN FLASH: 1024 byte large pages
+
+The standard erase command wipes 16 pages at once (1K = 2^10 bytes = 1024 bytes).
+
+To store variables in main flash (nonvolatile) you need to reserve space first.
+nonvolatile storage needs to be
+	aligned to 1K
+	a whole multiple of 1K
+
+in nonvolatile.ld, we define the .nonvolatile section:
+SECTIONS
+{
+	.nonvolatile : {
+		. = ALIGN(1K);
+		_reserved_nv_start = .;
+		KEEP(*(.nonvolatile));
+		. += (1K * n);
+		_reserved_nv_end = .;
+	} >FLASH AT>FLASH
+}
+"KEEP" tells gcc to really allocate the space, despite calling gcc with -Wl,--gc-sections, which will remove any flash allocations it thinks are "unused"
+
+then, still in the .ld we pass the start and end addresses to the .c file
+PROVIDE(_reserved_nv_start = _reserved_nv_start);
+PROVIDE(_reserved_nv_end = _reserved_nv_end);
+
+to alter main flash:
+1. unlock flash
+3. erase 1024 byte large page(s) to be written to
+4. lock fast programming mode
+5. program all desired values to the page(s)
+6. lock
+
+
+
 TECHNICAL NOTES:
+HARDWARE:
+CH32V003 has 16K =
+	16 * 2^10 bytes
+	16384 bytes
+	0x08003FFF-0x08000000+1
+	256 pages * 64 bytes
+erase	= turn all bits into 1
+program = turn the desired bits into 0, always 2 bytes at a time
+write	= erase + program
+
+Integrated flash has limited write cycles (10K as per datasheet) and will thus wear out quickly if you're not very careful!!
+For frequent writes use external flash chips, they are far more robust!
 
 main flash:
-trying to write to addresses outside the main flash (offsets larger than what you reserved) will likely make your micro controller freeze, so be sure that your code doesn't attempt.
+trying to write to addresses outside the main flash (offsets larger than what you reserved) will likely make your micro controller freeze or lead to garbled serial output, so be sure that your code doesn't attempt.
 
-option bytes (user-selected words):
+option bytes (inside user-selected words):
 The data is stored as IIIIIIII DDDDDDDD, where D is data (byte0) and I is the inverse of data (byte 1).
 The user is supposed to be able to compare and discover errors, but it doesn't allow for error recovery.
 To write a byte (8 bits), the write needs to be 16 bits (uint16_t), the upper 16 bits (I) will automagically be replaced with the inverted bit pattern of D.
@@ -88,52 +174,60 @@ You may also OB->Data1 and discard the upper 8 (inverted) bits by >>8 yourself i
 
 ADDRESS CALCULATIONS:
 
-for storing variables in main flash the address can be calculated like this:
+While the flash region may be aliased to 0x00, we want to use its real address, starting at 0x08000000.
+For storing variables in main flash the address can be calculated like this:
 address of byte nonvolatile[n] = FLASH_BASE + N_BYTES + [n];
 where n is the offset from the start of your reserved nonvolatile storage
 example:
-nonvolatile[15] = 0x08000000 + 16320 + 1 + 15
+nonvolatile[15] = 0x08000000 + _reserved_nv_start + 15
 
-flash_calcualte_nonvolatile_addr(n) does exactly that
-suggestion: calculate all non-volatile storage adresses at beginning of main and store them in variables
-better suggestion: use the FLASH_PRECALCULATE_NONVOLATILE_ADDR(n) preprocessor macro #defining your addresses, this way the math will be done at compile time
+The flash_calcualte_nonvolatile_addr(n) function and FLASH_PRECALCULATE_NONVOLATILE_ADDR(n) preprocessor macro do exactly that.
+We recommend using the macro to #define the addresses of the variables you want to store at compile time.
+This way, that math stays off the MCU.
 */
-
 
 
 //######## function overview (declarations): use these!
 
 // calculate address at runtime, you can use compile-time addresses instead!
-static inline uint32_t flash_calcualte_nonvolatile_addr(uint16_t byte_number);
+uint32_t flash_calcualte_nonvolatile_addr(uint16_t byte_number);
 
 // set the flash controller latency in accordance with the SYSTEM_CORE_CLOCK speed
 static inline void flash_set_latency();
 
 // unlock flash altering
 static inline void flash_unlock();
+// unlock fast programming mode for 64byte erase
+static inline void flash_fastp_unlock();
 // unlock option bytes altering, additionally
 static inline void flash_OB_unlock();
 // lock flash when you're done
 static inline void flash_lock();
+// lock fast programming mode
+static inline void flash_fastp_lock();
 
 // erase a page (sorry, smaller erases impossible on CH32V003!)
 // x -> 1
+static inline void flash_erase_1K(uint32_t start_addr);
 static inline void flash_erase_64b(uint32_t start_addr);
 
 // program 2 bytes at once
 // 1 -> 0
 static inline void flash_program_16(uint32_t addr, uint16_t data);
-static inline void flash_program_2x8(uint32_t addr, uint8_t byte1, uint8_t byte0);
-static inline void flash_program_float(uint32_t addr, float value);
-
-// read data
 static inline uint16_t flash_get_16(uint32_t addr);
+static inline void flash_program_2x8(uint32_t addr, uint8_t byte1, uint8_t byte0);
 static inline uint8_t flash_get_8(uint32_t addr);
+static inline void flash_program_float(uint32_t addr, float value);
 static inline float flash_get_float(uint32_t addr);
 
 // write data to option bytes, keeping other contents intact
 // 		= backup + erase + write (restoring backup)
 static inline void flash_OB_write_data_16(uint16_t data);
+// read data of option bytes
+static inline uint8_t flash_OB_get_DATA1();
+static inline uint8_t flash_OB_get_DATA0();
+static inline uint16_t flash_OB_get_DATA_16();
+
 static inline void flash_OB_write_data_2x8(uint8_t data1, uint8_t data0);
 
 // read option bytes
@@ -141,11 +235,6 @@ static inline uint8_t flash_OB_get_USER();
 static inline uint8_t flash_OB_get_RDPR();
 static inline uint8_t flash_OB_get_WRPR1();
 static inline uint8_t flash_OB_get_WRPR0();
-
-// read data of option bytes
-static inline uint8_t flash_OB_get_DATA1();
-static inline uint8_t flash_OB_get_DATA0();
-static inline uint16_t flash_OB_get_DATA_16();
 
 
 
@@ -161,7 +250,7 @@ static inline void flash_is_done_clear();
 
 // wait for flash
 static inline void flash_wait_until_not_busy();
-static inline void flash_wait_until_done();
+//static inline void flash_wait_until_done();
 
 // test that first 8 bits are the inverse of the last 8 bits
 static inline uint8_t flash_dechecksum(uint16_t input);
@@ -172,8 +261,9 @@ static inline void flash_OB_erase();
 
 
 //######## internal variables
-
-extern char FLASH_LENGTH_OVERRIDE[]; // import from .ld, halal by https://sourceware.org/binutils/docs/ld/Source-Code-Reference.html
+// import from .ld, halal by https://sourceware.org/binutils/docs/ld/Source-Code-Reference.html
+extern char _reserved_nv_start[]; 
+extern char _reserved_nv_end[]; 
 
 union float_2xuint16t {
 	float f;
@@ -182,10 +272,10 @@ union float_2xuint16t {
 
 //######## preprocessor macros
 
-#define FLASH_VOLATILE_CAPACITY (FLASH_BASE-FLASH_LENGTH_OVERRIDE)
+#define FLASH_VOLATILE_CAPACITY (_reserved_end - _reserved_nv_start)
 
 // use this to define main flash nonvolatile addresses at compile time!
-#define FLASH_PRECALCULATE_NONVOLATILE_ADDR(n) FLASH_BASE+(uint32_t)(uintptr_t)(FLASH_LENGTH_OVERRIDE)+n 
+#define FLASH_PRECALCULATE_NONVOLATILE_ADDR(n) (FLASH_BASE + (uint16_t)(uintptr_t)(_reserved_nv_start) + n)
 
 
 
@@ -197,11 +287,12 @@ union float_2xuint16t {
 #endif
 
 
+
 //######## small function definitions, static inline
 
-static inline uint32_t flash_calcualte_nonvolatile_addr(uint16_t byte_number) {
+uint32_t flash_calcualte_nonvolatile_addr(uint16_t byte_number) {
 	//if (byte_number < FLASH_VOLATILE_CAPACITY) {}
-	return (FLASH_BASE + (uint16_t)(uintptr_t)FLASH_LENGTH_OVERRIDE + byte_number);
+	return (FLASH_BASE + ((uint16_t)(uintptr_t)_reserved_nv_start + byte_number));
 }
 
 static inline void flash_set_latency() {
@@ -216,6 +307,11 @@ static inline void flash_unlock() {
 	FLASH->KEYR = FLASH_KEY1;
 	FLASH->KEYR = FLASH_KEY2;
 }
+
+static inline void flash_fastp_unlock() {
+	FLASH->MODEKEYR = FLASH_KEY1;
+	FLASH->MODEKEYR = FLASH_KEY2;
+}
 static inline void flash_OB_unlock() {
 	FLASH->OBKEYR = FLASH_KEY1;
 	FLASH->OBKEYR = FLASH_KEY2;
@@ -223,9 +319,12 @@ static inline void flash_OB_unlock() {
 static inline void flash_lock() {
 	FLASH->CTLR |= FLASH_CTLR_LOCK;
 }
+static inline void flash_fastp_lock() {
+	FLASH->CTLR |= CR_FLOCK_Set;
+}
 
 // x -> 1
-static inline void flash_erase_64b(uint32_t start_addr) {
+static inline void flash_erase_1K(uint32_t start_addr) {
 	if(FLASH->CTLR & FLASH_CTLR_LOCK) {
 		return;
 	}
@@ -235,6 +334,18 @@ static inline void flash_erase_64b(uint32_t start_addr) {
 	FLASH->CTLR |= CR_STRT_Set;
 	flash_wait_until_not_busy();
 	FLASH->CTLR &= CR_PER_Reset;
+}
+
+static inline void flash_erase_64b(uint32_t start_addr) {
+	if(FLASH->CTLR & (FLASH_CTLR_LOCK | FLASH_CTLR_FLOCK)) {
+		return;
+	}
+	flash_wait_until_not_busy();
+	FLASH->CTLR |= CR_PAGE_ER;
+	FLASH->ADDR = start_addr; 
+	FLASH->CTLR |= CR_STRT_Set;
+	flash_wait_until_not_busy();
+	FLASH->CTLR &= ~CR_PAGE_ER;
 }
 
 // 1 -> 0
@@ -249,24 +360,24 @@ static inline void flash_program_16(uint32_t addr, uint16_t data) {
 	FLASH->CTLR |= CR_PG_Set;
 	*(uint16_t*)(uintptr_t)addr = data;
 	flash_wait_until_not_busy();
-	//flash_wait_until_done();
 	FLASH->CTLR &= CR_PG_Reset;
 }
+static inline uint16_t flash_get_16(uint32_t addr) {
+	return *(uint16_t*)(uintptr_t)addr;
+}
+
 static inline void flash_program_2x8(uint32_t addr, uint8_t byte1, uint8_t byte0) {
 	flash_program_16(addr, (byte1<<8)+byte0);
 }
+static inline uint8_t flash_get_8(uint32_t addr) {
+	return *(uint8_t*)(uintptr_t)addr;
+}
+
 static inline void flash_program_float(uint32_t addr, float value) {
 	union float_2xuint16t conv;
 	conv.f = value;
 	flash_program_16(addr, conv.u16[0]);
 	flash_program_16(addr, conv.u16[1]);
-}
-
-static inline uint16_t flash_get_16(uint32_t addr) {
-	return *(uint16_t*)(uintptr_t)addr;
-}
-static inline uint8_t flash_get_8(uint32_t addr) {
-	return *(uint8_t*)(uintptr_t)addr;
 }
 static inline float flash_get_float(uint32_t addr) {
 	union float_2xuint16t conv;
@@ -274,16 +385,6 @@ static inline float flash_get_float(uint32_t addr) {
 	conv.u16[1] = ((uint16_t*)(uintptr_t)addr)[1];
 	return conv.f;
 }
-/*
- * proof I don't know how to do bitmath on floats
-static inline float flash_program_float(uint32_t addr, float value) {
-	flash_program_16(addr, (value & 0b1111111111111111));
-	flash_program_16(addr, ((value >> 16) & 0b1111111111111111));
-}
-static inline float flash_get_float(uint32_t addr) {
-	return *((float*)(uintptr_t)(addr));
-}
-*/
 
 // 1 -> 0
 // is inlining still ok?
@@ -325,6 +426,17 @@ static inline void flash_OB_write_data_16(uint16_t data) {
 	//disable programming
 	FLASH->CTLR &= CR_OPTPG_Reset;
 }
+
+static inline uint8_t flash_OB_get_DATA1() {
+	return flash_dechecksum(OB->Data1);
+}
+static inline uint8_t flash_OB_get_DATA0() {
+	return flash_dechecksum(OB->Data0);
+}
+static inline uint16_t flash_OB_get_DATA_16() {
+	return (flash_OB_get_DATA1()<<8)+flash_OB_get_DATA0();
+}
+
 static inline void flash_OB_write_data_2x8(uint8_t data1, uint8_t data0) {
 	flash_OB_write_data_16((data1<<8)+data0);
 }
@@ -340,15 +452,6 @@ static inline uint8_t flash_OB_get_WRPR1() {
 }
 static inline uint8_t flash_OB_get_WRPR0() {
 	return flash_dechecksum(OB->WRPR0);
-}
-static inline uint8_t flash_OB_get_DATA1() {
-	return flash_dechecksum(OB->Data1);
-}
-static inline uint8_t flash_OB_get_DATA0() {
-	return flash_dechecksum(OB->Data0);
-}
-static inline uint16_t flash_OB_get_DATA_16() {
-	return (flash_OB_get_DATA1()<<8)+flash_OB_get_DATA0();
 }
 
 
@@ -370,10 +473,13 @@ static inline void flash_is_done_clear() {
 static inline void flash_wait_until_not_busy() {
 	while(flash_is_busy()) {}
 }
+
+/*
 static inline void flash_wait_until_done() {
 	while(flash_is_busy() || !flash_is_done()) {}
 	flash_is_done_clear();
 }
+*/
 
 static inline uint8_t flash_dechecksum(uint16_t input) {
 	uint8_t noninverted = input & 0b11111111;
@@ -393,7 +499,6 @@ static inline void flash_OB_erase() {
 	flash_wait_until_not_busy();
 	FLASH->CTLR &= CR_OPTER_Reset;
 }
-
 
 
 //######## implementation block
