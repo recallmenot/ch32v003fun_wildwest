@@ -49,7 +49,7 @@ The `instructions` dir is a place to collect information potentially useful to o
 It is a place for everyone, from bitmath for the absolute beginner to errors in the reference manual to advanced tricks.
 
 # contribute
-Before you write anything, have a look at the guildelines and templates in the [contribute dir](https://github.com/recallmenot/ch32v003fun_wildwest/tree/main/contribute).
+Before you pull anything onto here, please have a look at the guildelines and templates in the [contribute dir](https://github.com/recallmenot/ch32v003fun_wildwest/tree/main/contribute).
 
 ## own code
 Any code you provide is welcome if it works; be it a project, library or instructions.
