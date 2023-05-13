@@ -44,8 +44,12 @@ When we run make from `ch32v003fun/wildwest_proj/`, make will behave as if it wa
 for wild west lib: `../../lib`, is a direct relative path  
 for extralibs: `../../extralibs`, is a relative path through a symlink  
 
+# instructions / information
+The `instructions` dir is a place to collect information potentially useful to others.
+It is a place for everyone, from bitmath for the absolute beginner to errors in the reference manual to advanced tricks.
+
 # contribute
-Before you write anything, have a look at the guildelines, instructions and templates in the [contribute dir](https://github.com/recallmenot/ch32v003fun_wildwest/tree/main/contribute).
+Before you write anything, have a look at the guildelines and templates in the [contribute dir](https://github.com/recallmenot/ch32v003fun_wildwest/tree/main/contribute).
 
 ## own code
 Any code you provide is welcome if it works; be it a project, library or instructions.
