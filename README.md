@@ -40,9 +40,10 @@ mklink /D minichlink ..\ch32v003fun\minichlink
 ```
 
 ### references
-When we run make from `ch32v003fun/wildwest_proj/`, make will behave as if it was called from `ch32v003fun_wildwest/proj/`. Thus, you can use these path references:
-for wild west lib: `../../lib`, is a direct relative path  
-for extralibs: `../../extralibs`, is a relative path through a symlink  
+Thanks to the symlinks, we can run make directly from within `ch32v003fun_wildwest/proj/`.  
+Thus, we can use these path references:  
+for wild west lib: `../../lib`, which is a direct relative path  
+for extralibs: `../../extralibs`, which is a relative path through the symlink  
 
 # instructions / information
 The `instructions` dir is a place to collect information potentially useful to others.
