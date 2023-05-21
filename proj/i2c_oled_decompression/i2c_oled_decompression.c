@@ -59,6 +59,7 @@ void draw_image(uint8_t* input, uint8_t width, uint8_t height, uint8_t x, uint8_
 		// SSD1306 is in vertical mode, yet we want to draw horizontally, which necessitates assembling the output bytes from the input data
 		// bitmask for current pixel in vertical (output) byte
 		uint8_t v_mask = 1 << (y_absolute & 7);
+
 		for (uint8_t byte = 0; byte < bytes_to_draw; byte++) {
 			uint8_t input_byte = input[byte + line * bytes_to_draw];
 
