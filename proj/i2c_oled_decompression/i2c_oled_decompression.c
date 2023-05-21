@@ -40,47 +40,78 @@
 #include "compression.h"
 
 #define STDOUT_UART
-#define LOGimage
+#define LOGimage 0
 
-void draw_image(uint8_t* input, uint8_t width, uint8_t height, uint8_t x, uint8_t y) {
+
+void draw_image(uint8_t* input, uint8_t width, uint8_t height, uint8_t x, uint8_t y, uint8_t color_mode) {
 	uint8_t x_absolute;
 	uint8_t y_absolute;
-	// abort if lines > display height
 	uint8_t pixel;
 	uint8_t bytes_to_draw = width / 8;
+	uint16_t buffer_addr;
+
 	for (uint8_t line = 0; line < height; line++) {
 		y_absolute = y + line;
 		if (y_absolute >= SSD1306_H) {
 			break;
 		}
+
+		// SSD1306 is in vertical mode, yet we want to draw horizontally, which necessitates assembling the output bytes from the input data
+		// bitmask for current pixel in vertical (output) byte
+		uint8_t v_mask = 1 << (y_absolute & 7);
 		for (uint8_t byte = 0; byte < bytes_to_draw; byte++) {
-			#ifdef LOGimage
-			printf("%02x ", input[byte + line * bytes_to_draw]);
-			#endif
+			uint8_t input_byte = input[byte + line * bytes_to_draw];
+
 			for (pixel = 0; pixel < 8; pixel++) {
 				x_absolute = x + 8 * (bytes_to_draw - byte) + pixel;
 				if (x_absolute >= SSD1306_W) {
 					break;
 				}
-				if(input[byte + line * bytes_to_draw] & (1 << pixel)) {
-					ssd1306_drawPixel(x_absolute, y_absolute, 1);
+				// looking at the horizontal display, we're drawing bytes bottom to top, not left to right, hence y / 8
+				buffer_addr = x_absolute + SSD1306_W * (y_absolute / 8);
+				// state of current pixel
+				uint8_t input_pixel = input_byte & (1 << pixel);
+
+				switch (color_mode) {
+					case 0:
+						// write pixels as they are
+						ssd1306_buffer[buffer_addr] = (ssd1306_buffer[buffer_addr] & ~v_mask) | (input_pixel ? v_mask : 0);
+						break;
+					case 1:
+						// write pixels after inversion
+						ssd1306_buffer[buffer_addr] = (ssd1306_buffer[buffer_addr] & ~v_mask) | (!input_pixel ? v_mask : 0);
+						break;
+					case 2:
+						// 0 clears pixel
+						ssd1306_buffer[buffer_addr] &= input_pixel ? 0xFF : ~v_mask;
+						break;
+					case 3:
+						// 1 sets pixel
+						ssd1306_buffer[buffer_addr] |= input_pixel ? v_mask : 0;
+						break;
+					case 4:
+						// 0 sets pixel
+						ssd1306_buffer[buffer_addr] |= !input_pixel ? v_mask : 0;
+						break;
+					case 5:
+						// 1 clears pixel
+						ssd1306_buffer[buffer_addr] &= input_pixel ? ~v_mask : 0xFF;
+						break;
 				}
-				#if defined (TIFFG4_opaque_black)
-				else {
-					ssd1306_drawPixel(x_absolute, y_absolute, 0);
-				}
-				#endif
 			}
+			#if LOGimage == 1
+			printf("%02x ", input_byte);
+			#endif
 		}
-		#ifdef LOGimage
+		#if LOGimage == 1
 		printf("\n\r");
 		#endif
-      	}
+	}
 }
 
 
 
-void unpack_image(uint8_t* input, uint16_t size_of_input, uint8_t width, uint8_t height, uint8_t x, uint8_t y) {
+void unpack_image(uint8_t* input, uint16_t size_of_input, uint8_t width, uint8_t height, uint8_t x, uint8_t y, uint8_t color_mode) {
 	uint16_t output_max_size = (width / 8) * height;
 	#if MALLOC_OVERRIDE > 0
 	uint8_t* output = malloc(output_max_size);
@@ -93,11 +124,11 @@ void unpack_image(uint8_t* input, uint16_t size_of_input, uint8_t width, uint8_t
 	#elif COMP_HEATSHRINK == 1
 	uint16_t unpack_error = decompress_heatshrink(input, size_of_input, output, &output_max_size);
 	#endif
-	#ifdef LOGimage
-	printf("unpackbits return %u\n\r", unpack_error);
-	printf("unpackbits sizes IN %u OUT %u\n\r", size_of_input, output_max_size);
+	#if LOGimage == 1
+	printf("unpack return %u\n\r", unpack_error);
+	printf("unpack size IN %u OUT %u\n\r", size_of_input, output_max_size);
 	#endif
-	draw_image(output, width, height, x, y);
+	draw_image(output, width, height, x, y, color_mode);
 	#if MALLOC_OVERRIDE > 0
 	free(output);
 	#endif
@@ -105,7 +136,7 @@ void unpack_image(uint8_t* input, uint16_t size_of_input, uint8_t width, uint8_t
 
 
 
-void unpack_image_number(uint8_t* input, uint16_t size_of_input, uint8_t width, uint8_t height, uint8_t image_number, uint8_t x, uint8_t y) {
+void unpack_image_number(uint8_t* input, uint16_t size_of_input, uint8_t width, uint8_t height, uint8_t image_number, uint8_t x, uint8_t y, uint8_t color_mode) {
 	uint16_t output_max_size = (width / 8) * height;
 	#if MALLOC_OVERRIDE > 0
 	uint8_t* output = malloc(output_max_size);
@@ -118,11 +149,11 @@ void unpack_image_number(uint8_t* input, uint16_t size_of_input, uint8_t width, 
 	#elif COMP_HEATSHRINK == 1
 	uint16_t unpack_error = decompress_heatshrink_window(input, size_of_input, output, start_byte_offset, &output_max_size);
 	#endif
-	#ifdef LOGimage
-	printf("unpackbits return %u\n\r", unpack_error);
-	printf("unpackbits sizes IN %u OUT %u\n\r", size_of_input, output_max_size);
+	#if LOGimage == 1
+	printf("unpack return %u\n\r", unpack_error);
+	printf("unpack size IN %u OUT %u\n\r", size_of_input, output_max_size);
 	#endif
-	draw_image(output, width, height, x, y);
+	draw_image(output, width, height, x, y, color_mode);
 	#if MALLOC_OVERRIDE > 0
 	free(output);
 	#endif
@@ -172,7 +203,7 @@ int main()
 						printf("draw decompressed bomb\n\r");
 						#if COMP_PACKBITS == 1
 						printf("packbits\n\r");
-						unpack_image(bomb_i_packed, bomb_i_packed_len, 32, 32, 16, 0);
+						unpack_image(bomb_i_packed, bomb_i_packed_len, 32, 32, 16, 0, 0);
 						#elif COMP_HEATSHRINK == 1
 						printf("heatshrink\n\r");
 						unpack_image(bomb_i_heatshrunk, bomb_i_heatshrunk_len, 32, 32, 16, 0);
@@ -180,11 +211,11 @@ int main()
 						break;
 					case 2:
 						printf("launch a compressed rocket\n\r");
-						for (uint8_t loop = 0; loop < 5; loop++) {
+						for (uint8_t loop = 0; loop < 6; loop++) {
 							for (uint8_t image = 0;image < 26; image++) {
-								ssd1306_setbuf(0);
+								//ssd1306_setbuf(0);
 								#if COMP_PACKBITS == 1
-								unpack_image_number(rocket_i_packed, rocket_i_packed_len, 32, 32, image, 0, 0);
+								unpack_image_number(rocket_i_packed, rocket_i_packed_len, 32, 32, image, 0, 0, loop % 6);
 								#elif COMP_HEATSHRINK == 1
 								unpack_image_number(img_rocket_i_heatshrunk, img_rocket_i_heatshrunk_len, 32, 32, image, 0, 0);
 								#endif
