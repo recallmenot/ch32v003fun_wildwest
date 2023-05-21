@@ -23,8 +23,8 @@
 #include <stdlib.h>
 #endif
 
-#define COMP_PACKBITS 1
-#define COMP_HEATSHRINK 0
+#define COMP_PACKBITS 0
+#define COMP_HEATSHRINK 1
 #if (COMP_PACKBITS == 1) && (COMP_HEATSHRINK == 1)
 #error "please only enable packbits OR heatshrink"
 #endif
@@ -41,6 +41,7 @@
 
 #define STDOUT_UART
 #define LOGimage 0
+
 
 
 void draw_image(uint8_t* input, uint8_t width, uint8_t height, uint8_t x, uint8_t y, uint8_t color_mode) {
@@ -207,7 +208,7 @@ int main()
 						unpack_image(bomb_i_packed, bomb_i_packed_len, 32, 32, 16, 0, 0);
 						#elif COMP_HEATSHRINK == 1
 						printf("heatshrink\n\r");
-						unpack_image(bomb_i_heatshrunk, bomb_i_heatshrunk_len, 32, 32, 16, 0);
+						unpack_image(bomb_i_heatshrunk, bomb_i_heatshrunk_len, 32, 32, 16, 0, 0);
 						#endif
 						break;
 					case 2:
@@ -218,7 +219,7 @@ int main()
 								#if COMP_PACKBITS == 1
 								unpack_image_number(rocket_i_packed, rocket_i_packed_len, 32, 32, image, 0, 0, loop % 6);
 								#elif COMP_HEATSHRINK == 1
-								unpack_image_number(img_rocket_i_heatshrunk, img_rocket_i_heatshrunk_len, 32, 32, image, 0, 0);
+								unpack_image_number(rocket_i_heatshrunk, rocket_i_heatshrunk_len, 32, 32, image, 0, 0, loop % 6);
 								#endif
 								ssd1306_refresh();
 								Delay_Ms( 30 );
