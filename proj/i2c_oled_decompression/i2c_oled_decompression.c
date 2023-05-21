@@ -24,10 +24,19 @@
 #endif
 
 #define COMP_PACKBITS 1
-#define COMP_HEATSHRINK 1
+#define COMP_HEATSHRINK 0
+#if (COMP_PACKBITS == 1) && (COMP_HEATSHRINK == 1)
+#error "please only enable packbits OR heatshrink"
+#endif
+#if (COMP_PACKBITS == 0) && (COMP_HEATSHRINK == 0)
+#error "please enable packbits or heatshrink"
+#endif
 
 #include "bomb_i_packed.h"
 #include "bomb_i_heatshrunk.h"
+#include "rocket_i_packed.h"
+#include "rocket_i_heatshrunk.h"
+
 #include "compression.h"
 
 #define STDOUT_UART
@@ -72,14 +81,18 @@ void draw_image(uint8_t* input, uint8_t width, uint8_t height, uint8_t x, uint8_
 
 
 void unpack_image(uint8_t* input, uint16_t size_of_input, uint8_t width, uint8_t height, uint8_t x, uint8_t y) {
-	uint32_t output_max_size = (width / 8) * height;
+	uint16_t output_max_size = (width / 8) * height;
 	#if MALLOC_OVERRIDE > 0
 	uint8_t* output = malloc(output_max_size);
 	#else
 	uint8_t output[output_max_size];
 	#endif
-	data_object data = {input, size_of_input, output, output_max_size, 0, width, height, 0};
-	uint16_t unpack_error = decompress_heatshrink(&data);
+
+	#if COMP_PACKBITS == 1
+	uint16_t unpack_error = decompress_packbits(input, size_of_input, output, &output_max_size);
+	#elif COMP_HEATSHRINK == 1
+	uint16_t unpack_error = decompress_heatshrink(input, size_of_input, output, &output_max_size);
+	#endif
 	#ifdef LOGimage
 	printf("unpackbits return %u\n\r", unpack_error);
 	printf("unpackbits sizes IN %u OUT %u\n\r", size_of_input, output_max_size);
@@ -89,6 +102,32 @@ void unpack_image(uint8_t* input, uint16_t size_of_input, uint8_t width, uint8_t
 	free(output);
 	#endif
 }
+
+
+
+void unpack_image_number(uint8_t* input, uint16_t size_of_input, uint8_t width, uint8_t height, uint8_t image_number, uint8_t x, uint8_t y) {
+	uint16_t output_max_size = (width / 8) * height;
+	#if MALLOC_OVERRIDE > 0
+	uint8_t* output = malloc(output_max_size);
+	#else
+	uint8_t output[output_max_size];
+	uint16_t start_byte_offset = output_max_size * image_number;
+	#endif
+	#if COMP_PACKBITS == 1
+	uint16_t unpack_error = decompress_packbits_window(input, size_of_input, output, start_byte_offset, &output_max_size);
+	#elif COMP_HEATSHRINK == 1
+	uint16_t unpack_error = decompress_heatshrink_window(input, size_of_input, output, start_byte_offset, &output_max_size);
+	#endif
+	#ifdef LOGimage
+	printf("unpackbits return %u\n\r", unpack_error);
+	printf("unpackbits sizes IN %u OUT %u\n\r", size_of_input, output_max_size);
+	#endif
+	draw_image(output, width, height, x, y);
+	#if MALLOC_OVERRIDE > 0
+	free(output);
+	#endif
+}
+
 
 
 int main()
@@ -116,10 +155,11 @@ int main()
 		printf("Looping on test modes...");
 		while(1)
 		{
-			for(uint8_t mode=7;mode<(SSD1306_H>32?8:9);mode++)
+			for(uint8_t mode=0;mode<3;mode++)
 			{
 				// clear buffer for next mode
 				ssd1306_setbuf(0);
+				
 
 				switch(mode)
 				{
@@ -128,73 +168,31 @@ int main()
 						for(int i=0;i<sizeof(ssd1306_buffer);i++)
 							ssd1306_buffer[i] = i;
 						break;
-					
 					case 1:
-						printf("pixel plots\n\r");
-						for(int i=0;i<SSD1306_W;i++)
-						{
-							ssd1306_drawPixel(i, i/(SSD1306_W/SSD1306_H), 1);
-							ssd1306_drawPixel(i, SSD1306_H-1-(i/(SSD1306_W/SSD1306_H)), 1);
-						}
+						printf("draw decompressed bomb\n\r");
+						#if COMP_PACKBITS == 1
+						printf("packbits\n\r");
+						unpack_image(bomb_i_packed, bomb_i_packed_len, 32, 32, 16, 0);
+						#elif COMP_HEATSHRINK == 1
+						printf("heatshrink\n\r");
+						unpack_image(bomb_i_heatshrunk, bomb_i_heatshrunk_len, 32, 32, 16, 0);
+						#endif
 						break;
-					
 					case 2:
-						{
-							printf("Line plots\n\r");
-							uint8_t y= 0;
-							for(uint8_t x=0;x<SSD1306_W;x+=16)
-							{
-								ssd1306_drawLine(x, 0, SSD1306_W, y, 1);
-								ssd1306_drawLine(SSD1306_W-x, SSD1306_H, 0, SSD1306_H-y, 1);
-								y+= SSD1306_H/8;
+						printf("launch a compressed rocket\n\r");
+						for (uint8_t loop = 0; loop < 5; loop++) {
+							for (uint8_t image = 0;image < 26; image++) {
+								ssd1306_setbuf(0);
+								#if COMP_PACKBITS == 1
+								unpack_image_number(rocket_i_packed, rocket_i_packed_len, 32, 32, image, 0, 0);
+								#elif COMP_HEATSHRINK == 1
+								unpack_image_number(img_rocket_i_heatshrunk, img_rocket_i_heatshrunk_len, 32, 32, image, 0, 0);
+								#endif
+								ssd1306_refresh();
+								Delay_Ms( 30 );
 							}
 						}
 						break;
-						
-					case 3:
-						printf("Circles empty and filled\n\r");
-						for(uint8_t x=0;x<SSD1306_W;x+=16)
-							if(x<64)
-								ssd1306_drawCircle(x, SSD1306_H/2, 15, 1);
-							else
-								ssd1306_fillCircle(x, SSD1306_H/2, 15, 1);
-						break;
-					
-					case 4:
-						printf("Unscaled Text\n\r");
-						ssd1306_drawstr(0,0, "This is a test", 1);
-						ssd1306_drawstr(0,8, "of the emergency", 1);
-						ssd1306_drawstr(0,16,"broadcasting", 1);
-						ssd1306_drawstr(0,24,"system.",1);
-						if(SSD1306_H>32)
-						{
-							ssd1306_drawstr(0,32, "Lorem ipsum", 1);
-							ssd1306_drawstr(0,40, "dolor sit amet,", 1);
-							ssd1306_drawstr(0,48,"consectetur", 1);
-							ssd1306_drawstr(0,56,"adipiscing",1);
-						}
-						ssd1306_xorrect(SSD1306_W/2, 0, SSD1306_W/2, SSD1306_W);
-						break;
-						
-					case 5:
-						printf("Scaled Text 1, 2\n\r");
-						ssd1306_drawstr_sz(0,0, "sz 8x8", 1, fontsize_8x8);
-						ssd1306_drawstr_sz(0,16, "16x16", 1, fontsize_16x16);
-						break;
-					
-					case 6:
-						printf("Scaled Text 4\n\r");
-						ssd1306_drawstr_sz(0,0, "32x32", 1, fontsize_32x32);
-						break;
-					
-					
-					case 7:
-						printf("Scaled Text 8\n\r");
-						ssd1306_drawstr_sz(0,0, "64", 1, fontsize_64x64);
-						break;
-					case 8:
-						printf("packbits-compressed image\n\r");
-						unpack_image(bomb_i_heatshrunk, bomb_i_heatshrunk_len, 32, 32, 16, 0);
 					default:
 						break;
 				}
