@@ -30,6 +30,7 @@ cd ch32v003fun_wildwest
 ln -s ../ch32v003fun/ch32v003fun ch32v003fun
 ln -s ../ch32v003fun/extralibs extralibs
 ln -s ../ch32v003fun/minichlink minichlink
+ln -s ../ch32v003fun/examples examples
 ```
 ### Windows:
 ```

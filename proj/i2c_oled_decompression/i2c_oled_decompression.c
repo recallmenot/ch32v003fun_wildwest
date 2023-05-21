@@ -39,6 +39,8 @@
 
 #include "compression.h"
 
+#include "../../examples/systick_irq_millis/systick.h"
+
 #define STDOUT_UART
 #define LOGimage 0
 
@@ -167,18 +169,19 @@ int main()
 {
 	// 48MHz internal clock
 	SystemInit48HSI();
+	systick_init();
 
 	// start serial @ default 115200bps
 #ifdef STDOUT_UART
 	SetupUART( UART_BRR );
-	Delay_Ms( 100 );
+	systick_delay_ms( 100 );
 #else
 	SetupDebugPrintf();
 #endif
 	printf("\r\r\n\ni2c_oled example\n\r");
 
 	// init i2c and oled
-	Delay_Ms( 100 );	// give OLED some more time
+	systick_delay_ms( 100 );	// give OLED some more time
 	printf("initializing i2c oled...");
 	if(!ssd1306_i2c_init())
 	{
@@ -192,7 +195,6 @@ int main()
 			{
 				// clear buffer for next mode
 				ssd1306_setbuf(0);
-				
 
 				switch(mode)
 				{
@@ -213,25 +215,33 @@ int main()
 						break;
 					case 2:
 						printf("launch a compressed rocket\n\r");
+						const uint16_t frame_i = 33;
+						uint32_t frame_t = 0;
+						uint32_t decomp_t = 0;
 						for (uint8_t loop = 0; loop < 6; loop++) {
 							for (uint8_t image = 0;image < 26; image++) {
+								while (millis() - frame_t < frame_i) {};
 								//ssd1306_setbuf(0);
+								frame_t = millis();		// missappropriate as stopwatch
 								#if COMP_PACKBITS == 1
 								unpack_image_number(rocket_i_packed, rocket_i_packed_len, 32, 32, image, 0, 0, loop % 6);
 								#elif COMP_HEATSHRINK == 1
 								unpack_image_number(rocket_i_heatshrunk, rocket_i_heatshrunk_len, 32, 32, image, 0, 0, loop % 6);
 								#endif
 								ssd1306_refresh();
-								Delay_Ms( 30 );
+								decomp_t += millis() - frame_t;	// time to decompress last frame
+								frame_t = millis();		// restore scheduling functionality
 							}
 						}
+						decomp_t /= 26 * 6;
+						printf("spent %lu ms decompressing and writing each frame\n\r", decomp_t);
 						break;
 					default:
 						break;
 				}
 				ssd1306_refresh();
 			
-				Delay_Ms(2000);
+				systick_delay_ms(2000);
 			}
 		}
 	}
