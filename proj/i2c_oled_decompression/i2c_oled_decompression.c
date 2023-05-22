@@ -1,6 +1,7 @@
 /*
- * Example for using I2C with 128x32 graphic OLED
- * 03-29-2023 E. Brombaugh
+ * example for decompressing images to SSD1306
+ * 05-22-2023 recallmenot
+ * I2C SSD1306 library by E. Brombaugh
  */
 
 // Could be defined here, or in the processor defines.
@@ -39,7 +40,7 @@
 
 #include "compression.h"
 
-#include "../../examples/systick_irq_millis/systick.h"
+#include "../../lib/ch32v003_systick_millis.h"
 
 #define STDOUT_UART
 #define LOGimage 0
@@ -222,15 +223,14 @@ int main()
 							for (uint8_t image = 0;image < 26; image++) {
 								while (millis() - frame_t < frame_i) {};
 								//ssd1306_setbuf(0);
-								frame_t = millis();		// missappropriate as stopwatch
+								frame_t = millis();		// start timer for next frame, but also missappropriate as stopwatch
 								#if COMP_PACKBITS == 1
 								unpack_image_number(rocket_i_packed, rocket_i_packed_len, 32, 32, image, 0, 0, loop % 6);
 								#elif COMP_HEATSHRINK == 1
 								unpack_image_number(rocket_i_heatshrunk, rocket_i_heatshrunk_len, 32, 32, image, 0, 0, loop % 6);
 								#endif
 								ssd1306_refresh();
-								decomp_t += millis() - frame_t;	// time to decompress last frame
-								frame_t = millis();		// restore scheduling functionality
+								decomp_t += millis() - frame_t;	// time to decompress and display last frame
 							}
 						}
 						decomp_t /= 26 * 6;
