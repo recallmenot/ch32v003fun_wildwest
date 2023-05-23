@@ -5,12 +5,17 @@
 #include "../../ch32v003fun/ch32v003fun.h"
 #include <stdio.h>
 
+#define STANDBY_RESTORE_HSI_48MHz
+#include "../standby_autowake/ch32v003_standby.h"
+
 #define APB_CLOCK SYSTEM_CORE_CLOCK
 
+/*
 void EXTI7_0_IRQHandler( void ) __attribute__((interrupt));
 void EXTI7_0_IRQHandler( void ) {
 	//GPIOD->OUTDR ^= (1 << 4);
 }
+*/
 
 
 
@@ -31,34 +36,14 @@ int main()
 	//Delay_Ms(5000);
 	//printf("5000ms wait over\r\n");
 	
-	// enable alternate IO function module clock
-	RCC->APB2PCENR |= RCC_AFIOEN;
-
-	// configure button on PD2 as input, pullup
-	GPIOD->CFGLR &= ~(0xf<<(2*4));
-	GPIOD->CFGLR |= (GPIO_CNF_IN_PUPD)<<(2*4);
-	GPIOD->BSHR = (1 << 2);
-
-	// assign pin 2 interrupt from portD (0b11) to EXTI channel 2
-	AFIO->EXTICR |= (uint32_t)(0b11 << (2 * 2));
-
-	// enable line2 interrupt event
-	EXTI->EVENR |= EXTI_Line2;
-	EXTI->FTENR |= EXTI_Line2;
-
-	// select standby on power-down
-	PWR->CTLR |= PWR_CTLR_PDDS;
-
-	// peripheral interrupt controller send to deep sleep
-	PFIC->SCTLR |= (1 << 2);
+	standby_gpio_init();
+	standby_gpio_assign_pin(STANDBY_GPIO_PORT_D, 2);
 
 	uint16_t counter = 0;
 	printf("entering sleep loop\r\n");
 
 	for (;;) {
-		__WFE();
-		// restore clock to full speed
-		SystemInit48HSI();
+		standby_enter();
 		printf("\r\nawake, %u\r\n", counter++);
 		GPIOD->OUTDR ^= (1 << 4);
 	}
