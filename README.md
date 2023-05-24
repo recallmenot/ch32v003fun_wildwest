@@ -38,6 +38,7 @@ cd ch32v003fun_wildwest
 mklink /D ch32v003fun ..\ch32v003fun\ch32v003fun
 mklink /D extralibs ..\ch32v003fun\extralibs
 mklink /D minichlink ..\ch32v003fun\minichlink
+mklink /D examples ..\ch32v003fun\examples
 ```
 
 ### references
