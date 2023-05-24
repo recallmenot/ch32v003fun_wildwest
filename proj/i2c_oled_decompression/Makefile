@@ -4,7 +4,7 @@ TARGET:=i2c_oled_decompression
 
 CFLAGS+=-DSTDOUT_UART -I heatshrink
 
-heatshrink/libheatshrink_static.a:
+libheatshrink_static.a:
 	$(MAKE) -f heatshrink_static.mk
 
 ADDITIONAL_C_FILES+=packbits/packbits.c libheatshrink_static.a
