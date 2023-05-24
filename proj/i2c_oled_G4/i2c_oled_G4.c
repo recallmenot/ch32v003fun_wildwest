@@ -8,11 +8,6 @@
 #define SYSTEM_CORE_CLOCK 48000000
 #define APB_CLOCK SYSTEM_CORE_CLOCK
 
-// what type of OLED - uncomment just one
-//#define SSD1306_64X32
-#define SSD1306_128X32
-//#define SSD1306_128X64
-
 #include "../../ch32v003fun/ch32v003fun.h"
 
 // toggle for printf
@@ -29,10 +24,13 @@
 #define LOGu2(x, y, z)
 #endif
 
+// what type of OLED - uncomment just one
+//#define SSD1306_64X32
+#define SSD1306_128X32
+//#define SSD1306_128X64
 
-#include "ssd1306_i2c.h"
-#include "ssd1306.h"
-
+#include "../../examples/i2c_oled/ssd1306_i2c.h"
+#include "../../examples/i2c_oled/ssd1306.h"
 
 #undef __cplusplus			// prevent gcc from seing the C++ wrapper in .h
 #define __LINUX__			// circumvent #include of arduino.h
@@ -44,7 +42,7 @@
 #undef __AVR__
 #undef __LINUX__
 TIFFIMAGE tiff;				// instance of TIFFIMAGE struct
-#include "bomb-om.h"
+#include "bomb.h"
 
 
 
@@ -115,8 +113,7 @@ int main()
 		
 		// clear buffer for next mode
 		ssd1306_setbuf(0);
-		TIFF_openRAW(&tiff, 32, 32, BITDIR_MSB_FIRST, (uint8_t*)bomb_om, sizeof(bomb_om), TIFFDraw);
-		//TIFF_openTIFFRAM(&tiff, (uint8_t*)bomb_om, sizeof(bomb_om), TIFFDraw);
+		TIFF_openRAW(&tiff, 32, 32, BITDIR_MSB_FIRST, (uint8_t*)bomb, sizeof(bomb), TIFFDraw);
 		LOGu("Error after openRAW %u\n\r", tiff.iError);
 		TIFF_setDrawParameters(&tiff, 1.0f, TIFF_PIXEL_1BPP, 0, 0, 32, 32, NULL);
 		uint8_t tiff_x = TIFF_getWidth(&tiff);
