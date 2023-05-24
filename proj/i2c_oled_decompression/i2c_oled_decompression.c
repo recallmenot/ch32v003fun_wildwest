@@ -24,8 +24,8 @@
 #include <stdlib.h>
 #endif
 
-#define COMP_PACKBITS 1
-#define COMP_HEATSHRINK 0
+#define COMP_PACKBITS		1
+#define COMP_HEATSHRINK		0
 #if (COMP_PACKBITS == 1) && (COMP_HEATSHRINK == 1)
 #error "please only enable packbits OR heatshrink"
 #endif

@@ -26,4 +26,4 @@ all: libheatshrink_static.a
 heatshrink/heatshrink_encoder.os heatshrink/heatshrink_decoder.os: Makefile heatshrink/*.h
 
 clean:
-	$(RM) heatshrink/*.os heatshrink/libheatshrink_static.a
+	$(RM) heatshrink/*.os libheatshrink_static.a
