@@ -6,9 +6,9 @@
 
 // includes
 #include<stdint.h>								//uintN_t support
-#include "string.h"
 
-#ifndef CAPSENSE_SENSE_N_LINES
+// maintenance includes
+#ifndef CAPSENSE_PUSHPULL_PORT
 #include"../../ch32v003fun/ch32v003fun.h"
 #endif
 
@@ -83,10 +83,6 @@ to have capsense_enter() automatically restore the HSI speed to 48MHz after stan
 
 //######## preprocessor #define requirements
 
-#if CAPSENSE_SENSE_N_LINES < 1
-#error "please #define CAPSENSE_SENSE_N_LINES to at least one"
-#endif
-
 #ifndef CAPSENSE_PUSHPULL_PORT
 #error "please #define CAPSENSE_PUSHPULL_PORT to the port (use the CAPSENSE_GPIO_PORT_ macros)"
 #endif
@@ -98,15 +94,8 @@ to have capsense_enter() automatically restore the HSI speed to 48MHz after stan
 
 //######## preprocessor macros
 
-#define CAPSENSE_GPIO_REGISTER_BASE_I	1024
-#define CAPSENSE_GPIO_CFGLR_OFFSET	0x00
-#define CAPSENSE_GPIO_OUTDR_OFFSET	0x0C
-#define CAPSENSE_GPIO_BSHR_OFFSET	0x10
-#define CAPSENSE_GPIO_INDR_OFFSET	0x08
-#define CAPSENSE_TRIGGER_RISING_OFFSET	0x08
-#define CAPSENSE_TRIGGER_FALLING_OFFSET	0x0C
-
-#ifndef CAPSENSE_SENSE_N_LINES
+// maintenance defines
+#ifndef CAPSENSE_PUSHPULL_PORT
 #define CAPSENSE_PUSHPULL_PORT GPIOC
 #define CAPSENSE_PUSHPULL_PIN 7
 #define CAPSENSE_SENSE_PORT_L0 GPIOD
@@ -119,81 +108,15 @@ to have capsense_enter() automatically restore the HSI speed to 48MHz after stan
 #define CAPSENSE_SENSE_PORT_L7 GPIOD
 #endif
 
-#define CAPSENSE_SENSE_PORT(x) (CAPSENSE_SENSE_PORT_L##x) // concatenate number
-
 #define CAPSENSE_CEILING 0xfe
 
 
 //######## internal variables
 
-uint32_t capsense_t_now;
-/*
-uint32_t capsense_t_reached[CAPSENSE_SENSE_N_LINES] = {0};
-uint32_t capsense_t_result[CAPSENSE_SENSE_N_LINES] = {0};
-*/
-uint32_t capsense_t_pushpull = 0;
-uint16_t* capsense_t_result[8] = {0};
 
-uint8_t capsense_sense_reached_count = 0;
-
-uint8_t capsense_sense_line_active = 0;
 
 
 //######## small function definitions, static inline
-
-
-/*
-
-void EXTI7_0_IRQHandler( void ) __attribute__((interrupt));
-void EXTI7_0_IRQHandler( void ) {
-	// find line that raised interrupt (=pin)
-	capsense_sense_line_active = __builtin_ctz(EXTI->INTFR);
-	capsense_t_result[capsense_sense_line_active] = SysTick->CNT - capsense_t_pushpull;
-	capsense_sense_reached_count++;
-	// clear interrupt flag from line
-	EXTI->INTFR |= (1 << capsense_sense_line_active);
-	// when all 4 have reached trigger threshold
-	if (capsense_sense_reached_count >= CAPSENSE_SENSE_N_LINES) {
-		capsense_sense_reached_count = 0;
-		capsense_t_pushpull = SysTick->CNT;
-		// invert pushpull pin state
-		*(uint32_t*)(uintptr_t)(GPIOA_BASE + (CAPSENSE_GPIO_REGISTER_BASE_I * CAPSENSE_PUSHPULL_PORT) + CAPSENSE_GPIO_OUTDR_OFFSET) ^= (1 << CAPSENSE_PUSHPULL_PIN);
-	}
-	GPIOD->OUTDR ^= (1 << 4);
-}
-static inline void capsense_assign_pushpull() {
-	//pin mode output push pull
-	*(uint32_t*)(uintptr_t)(GPIOA_BASE + (CAPSENSE_GPIO_REGISTER_BASE_I * CAPSENSE_PUSHPULL_PORT) + CAPSENSE_GPIO_CFGLR_OFFSET) &= ~(0xf << (CAPSENSE_PUSHPULL_PIN * 4));
-	*(uint32_t*)(uintptr_t)(GPIOA_BASE + (CAPSENSE_GPIO_REGISTER_BASE_I * CAPSENSE_PUSHPULL_PORT) + CAPSENSE_GPIO_CFGLR_OFFSET) |= (GPIO_Speed_50MHz | GPIO_CNF_OUT_PP) << (CAPSENSE_PUSHPULL_PIN * 4);
-	*(uint32_t*)(uintptr_t)(GPIOA_BASE + (CAPSENSE_GPIO_REGISTER_BASE_I * CAPSENSE_PUSHPULL_PORT) + CAPSENSE_GPIO_BSHR_OFFSET) = (1 << CAPSENSE_PUSHPULL_PIN);
-}
-static inline void capsense_assign_sense(uint8_t capsense_gpio_port, uint8_t pin_number) {
-
-	// enable the correct GPIO port register
-	RCC->APB2PCENR |= (1 << (2 + capsense_gpio_port));
-
-	// sense as input, floating
-	*(uint32_t*)(uintptr_t)(GPIOA_BASE + (CAPSENSE_GPIO_REGISTER_BASE_I * capsense_gpio_port) + CAPSENSE_GPIO_CFGLR_OFFSET) &= ~(0xf << (pin_number * 4));
-	*(uint32_t*)(uintptr_t)(GPIOA_BASE + (CAPSENSE_GPIO_REGISTER_BASE_I * capsense_gpio_port) + CAPSENSE_GPIO_CFGLR_OFFSET) |= (GPIO_CNF_IN_FLOATING) << (pin_number * 4);
-
-	// enable alternate IO function module clock
-	RCC->APB2PCENR |= RCC_AFIOEN;
-
-	// assign pin 2 interrupt from portD (0b11) to EXTI channel 2
-	AFIO->EXTICR |= (uint32_t)(capsense_gpio_port << (pin_number * 2));
-
-	// enable line interrupt
-	EXTI->INTENR |= (1 << pin_number);
-
-	NVIC_EnableIRQ( EXTI7_0_IRQn );
-
-	// set to trigger at rising and falling edge
-	*(uint32_t*)(uintptr_t)(EXTI_BASE + CAPSENSE_TRIGGER_RISING_OFFSET) |= (1 << pin_number);
-	*(uint32_t*)(uintptr_t)(EXTI_BASE + CAPSENSE_TRIGGER_FALLING_OFFSET) |= (1 << pin_number);
-}
-
-*/
-
 
 
 
@@ -241,50 +164,7 @@ static inline void capsense_assign_sense() {
 	#endif
 }
 
-static inline GPIO_TypeDef* capsense_sense_port(int index) __attribute__((always_inline));
-static inline GPIO_TypeDef* capsense_sense_port(int index) {
-	#if defined(CAPSENSE_SENSE_PORT_L0)
-	if (index == 0) {
-		return CAPSENSE_SENSE_PORT_L0;
-	}
-	#endif
-	#if defined(CAPSENSE_SENSE_PORT_L1)
-	if (index == 1) {
-		return CAPSENSE_SENSE_PORT_L1;
-	}
-	#endif
-	#if defined(CAPSENSE_SENSE_PORT_L2)
-	if (index == 2) {
-		return CAPSENSE_SENSE_PORT_L2;
-	}
-	#endif
-	#if defined(CAPSENSE_SENSE_PORT_L3)
-	if (index == 3) {
-		return CAPSENSE_SENSE_PORT_L3;
-	}
-	#endif
-	#if defined(CAPSENSE_SENSE_PORT_L4)
-	if (index == 4) {
-		return CAPSENSE_SENSE_PORT_L4;
-	}
-	#endif
-	#if defined(CAPSENSE_SENSE_PORT_L5)
-	if (index == 5) {
-	return CAPSENSE_SENSE_PORT_L5;
-	}
-	#endif
-	#if defined(CAPSENSE_SENSE_PORT_L6)
-	if (index == 6) {
-		return CAPSENSE_SENSE_PORT_L6;
-	}
-	#endif
-	#if defined(CAPSENSE_SENSE_PORT_L7)
-	if (index == 7) {
-		return CAPSENSE_SENSE_PORT_L7;
-	}
-	#endif
-	return 0;
-}
+
 
 static inline uint8_t capsense_sense(GPIO_TypeDef* port, uint8_t pin) {
 	CAPSENSE_PUSHPULL_PORT->BSHR = 1 << (CAPSENSE_PUSHPULL_PIN + 16);
@@ -312,6 +192,7 @@ static inline uint8_t capsense_offset(uint8_t value, uint8_t cal, uint8_t thresh
 		return 0;
 	}
 }
+
 
 
 static inline uint8_t capsense_discretize(uint8_t value, uint8_t discard_bits) {

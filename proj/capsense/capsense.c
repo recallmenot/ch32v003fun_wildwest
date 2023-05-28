@@ -184,12 +184,6 @@ int main()
 				schd_sense_step++;
 
 			}
-				/*
-			else if (schd_sense_step == 4) {
-				capsense_filter(&slider_output, slider_pre_output);
-				schd_sense_step++;
-			}
-				*/
 			else if (schd_sense_step >= 4) {
 				//capsense_filter(&slider_output, slider_pre_output);
 				led_ctrl_t0 = (slider_output >> 2) * DELAY_US_TIME;		// on-time
