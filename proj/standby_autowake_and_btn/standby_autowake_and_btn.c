@@ -39,7 +39,8 @@ int main()
 	standby_autowakeup_init(63, PWR_AWU_Prescaler_10240);
 
 	standby_gpio_init();
-	standby_gpio_assign_button(STANDBY_GPIO_PORT_D, 2);
+	standby_gpio_assign_button(GPIOD, 2);
+	standby_gpio_assign_pin(STANDBY_GPIO_PORT_D, 2, STANDBY_TRIGGER_DIRECTION_FALLING);
 
 
 	uint16_t counter = 0;
