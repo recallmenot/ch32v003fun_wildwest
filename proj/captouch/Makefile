@@ -1,6 +1,6 @@
 all : flash
 
-TARGET:=capsense
+TARGET:=captouch
 
 CFLAGS+=-DSTDOUT_UART
 

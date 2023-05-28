@@ -1,14 +1,14 @@
 //######## necessities
 
 // include guards
-#ifndef CH32V003_CAPSENSE_H
-#define CH32V003_CAPSENSE_H
+#ifndef CH32V003_CAPTOUCH_H
+#define CH32V003_CAPTOUCH_H
 
 // includes
 #include<stdint.h>								//uintN_t support
 
 // maintenance includes
-#ifndef CAPSENSE_PUSHPULL_PORT
+#ifndef CAPTOUCH_PUSHPULL_PORT
 #include"../../ch32v003fun/ch32v003fun.h"
 #endif
 
@@ -53,23 +53,23 @@ Likewise, one of PA2, PC2 and PD2 can be connected to event channel 2, etc.
 
 /*######## features: use your desired before #including this library!
 
-to have capsense_enter() automatically restore the HSI speed to 48MHz after standby (else it will be 24MHz)
-#define CAPSENSE_RESTORE_HSI_48MHz
+to have captouch_enter() automatically restore the HSI speed to 48MHz after standby (else it will be 24MHz)
+#define CAPTOUCH_RESTORE_HSI_48MHz
 */
 
 
 
 //######## references: use these
 
-// port definitions for the capsense_gpio_assign functions
-#define CAPSENSE_GPIO_PORT_A 0b00
-#define CAPSENSE_GPIO_PORT_C 0b10
-#define CAPSENSE_GPIO_PORT_D 0b11
+// port definitions for the captouch_gpio_assign functions
+#define CAPTOUCH_GPIO_PORT_A 0b00
+#define CAPTOUCH_GPIO_PORT_C 0b10
+#define CAPTOUCH_GPIO_PORT_D 0b11
 
-// port definitions for the capsense_gpio_assign_pin functions
-#define CAPSENSE_TRIGGER_DIRECTION_RISING	0b01
-#define CAPSENSE_TRIGGER_DIRECTION_FALLING	0b10
-#define CAPSENSE_TRIGGER_DIRECTION_BOTH		0b11
+// port definitions for the captouch_gpio_assign_pin functions
+#define CAPTOUCH_TRIGGER_DIRECTION_RISING	0b01
+#define CAPTOUCH_TRIGGER_DIRECTION_FALLING	0b10
+#define CAPTOUCH_TRIGGER_DIRECTION_BOTH		0b11
 
 
 
@@ -83,32 +83,32 @@ to have capsense_enter() automatically restore the HSI speed to 48MHz after stan
 
 //######## preprocessor #define requirements
 
-#ifndef CAPSENSE_PUSHPULL_PORT
-#error "please #define CAPSENSE_PUSHPULL_PORT to the port (use the CAPSENSE_GPIO_PORT_ macros)"
+#ifndef CAPTOUCH_PUSHPULL_PORT
+#error "please #define CAPTOUCH_PUSHPULL_PORT to the port (use the CAPTOUCH_GPIO_PORT_ macros)"
 #endif
 
-#ifndef CAPSENSE_PUSHPULL_PIN
-#error "please #define CAPSENSE_PUSHPULL_PIN to the pin number of the desired pushpull pin"
+#ifndef CAPTOUCH_PUSHPULL_PIN
+#error "please #define CAPTOUCH_PUSHPULL_PIN to the pin number of the desired pushpull pin"
 #endif
 
 
 //######## preprocessor macros
 
 // maintenance defines
-#ifndef CAPSENSE_PUSHPULL_PORT
-#define CAPSENSE_PUSHPULL_PORT GPIOC
-#define CAPSENSE_PUSHPULL_PIN 7
-#define CAPSENSE_SENSE_PORT_L0 GPIOD
-#define CAPSENSE_SENSE_PORT_L1 GPIOD
-#define CAPSENSE_SENSE_PORT_L2 GPIOD
-#define CAPSENSE_SENSE_PORT_L3 GPIOD
-#define CAPSENSE_SENSE_PORT_L4 GPIOD
-#define CAPSENSE_SENSE_PORT_L5 GPIOD
-#define CAPSENSE_SENSE_PORT_L6 GPIOD
-#define CAPSENSE_SENSE_PORT_L7 GPIOD
+#ifndef CAPTOUCH_PUSHPULL_PORT
+#define CAPTOUCH_PUSHPULL_PORT GPIOC
+#define CAPTOUCH_PUSHPULL_PIN 7
+#define CAPTOUCH_SENSE_PORT_L0 GPIOD
+#define CAPTOUCH_SENSE_PORT_L1 GPIOD
+#define CAPTOUCH_SENSE_PORT_L2 GPIOD
+#define CAPTOUCH_SENSE_PORT_L3 GPIOD
+#define CAPTOUCH_SENSE_PORT_L4 GPIOD
+#define CAPTOUCH_SENSE_PORT_L5 GPIOD
+#define CAPTOUCH_SENSE_PORT_L6 GPIOD
+#define CAPTOUCH_SENSE_PORT_L7 GPIOD
 #endif
 
-#define CAPSENSE_CEILING 0xfe
+#define CAPTOUCH_CEILING 0xfe
 
 
 //######## internal variables
@@ -120,70 +120,70 @@ to have capsense_enter() automatically restore the HSI speed to 48MHz after stan
 
 
 
-static inline void capsense_assign_pushpull() {
+static inline void captouch_assign_pushpull() {
 	//pin mode output push pull
-	CAPSENSE_PUSHPULL_PORT->CFGLR &= ~(0xf << (CAPSENSE_PUSHPULL_PIN * 4));
-	CAPSENSE_PUSHPULL_PORT->CFGLR |= (GPIO_Speed_50MHz | GPIO_CNF_OUT_PP) << (CAPSENSE_PUSHPULL_PIN * 4);
-	CAPSENSE_PUSHPULL_PORT->BSHR = (1 << (CAPSENSE_PUSHPULL_PIN + 16));
+	CAPTOUCH_PUSHPULL_PORT->CFGLR &= ~(0xf << (CAPTOUCH_PUSHPULL_PIN * 4));
+	CAPTOUCH_PUSHPULL_PORT->CFGLR |= (GPIO_Speed_50MHz | GPIO_CNF_OUT_PP) << (CAPTOUCH_PUSHPULL_PIN * 4);
+	CAPTOUCH_PUSHPULL_PORT->BSHR = (1 << (CAPTOUCH_PUSHPULL_PIN + 16));
 }
 
-static inline void capsense_assign_sense() {
+static inline void captouch_assign_sense() {
 	// enable the correct GPIO port register
 	// sense as input, floating
-	#ifdef CAPSENSE_SENSE_PORT_L0
-	CAPSENSE_SENSE_PORT_L0->CFGLR &= ~(0xf << (0 * 4));
-	CAPSENSE_SENSE_PORT_L0->CFGLR |= (GPIO_CNF_IN_FLOATING) << (0 * 4);
+	#ifdef CAPTOUCH_SENSE_PORT_L0
+	CAPTOUCH_SENSE_PORT_L0->CFGLR &= ~(0xf << (0 * 4));
+	CAPTOUCH_SENSE_PORT_L0->CFGLR |= (GPIO_CNF_IN_FLOATING) << (0 * 4);
 	#endif
-	#ifdef CAPSENSE_SENSE_PORT_L1
-	CAPSENSE_SENSE_PORT_L1->CFGLR &= ~(0xf << (1 * 4));
-	CAPSENSE_SENSE_PORT_L1->CFGLR |= (GPIO_CNF_IN_FLOATING) << (1 * 4);
+	#ifdef CAPTOUCH_SENSE_PORT_L1
+	CAPTOUCH_SENSE_PORT_L1->CFGLR &= ~(0xf << (1 * 4));
+	CAPTOUCH_SENSE_PORT_L1->CFGLR |= (GPIO_CNF_IN_FLOATING) << (1 * 4);
 	#endif
-	#ifdef CAPSENSE_SENSE_PORT_L2
-	CAPSENSE_SENSE_PORT_L2->CFGLR &= ~(0xf << (2 * 4));
-	CAPSENSE_SENSE_PORT_L2->CFGLR |= (GPIO_CNF_IN_FLOATING) << (2 * 4);
+	#ifdef CAPTOUCH_SENSE_PORT_L2
+	CAPTOUCH_SENSE_PORT_L2->CFGLR &= ~(0xf << (2 * 4));
+	CAPTOUCH_SENSE_PORT_L2->CFGLR |= (GPIO_CNF_IN_FLOATING) << (2 * 4);
 	#endif
-	#ifdef CAPSENSE_SENSE_PORT_L3
-	CAPSENSE_SENSE_PORT_L3->CFGLR &= ~(0xf << (3 * 4));
-	CAPSENSE_SENSE_PORT_L3->CFGLR |= (GPIO_CNF_IN_FLOATING) << (3 * 4);
+	#ifdef CAPTOUCH_SENSE_PORT_L3
+	CAPTOUCH_SENSE_PORT_L3->CFGLR &= ~(0xf << (3 * 4));
+	CAPTOUCH_SENSE_PORT_L3->CFGLR |= (GPIO_CNF_IN_FLOATING) << (3 * 4);
 	#endif
-	#ifdef CAPSENSE_SENSE_PORT_L4
-	CAPSENSE_SENSE_PORT_L4->CFGLR &= ~(0xf << (4 * 4));
-	CAPSENSE_SENSE_PORT_L4->CFGLR |= (GPIO_CNF_IN_FLOATING) << (4 * 4);
+	#ifdef CAPTOUCH_SENSE_PORT_L4
+	CAPTOUCH_SENSE_PORT_L4->CFGLR &= ~(0xf << (4 * 4));
+	CAPTOUCH_SENSE_PORT_L4->CFGLR |= (GPIO_CNF_IN_FLOATING) << (4 * 4);
 	#endif
-	#ifdef CAPSENSE_SENSE_PORT_L5
-	CAPSENSE_SENSE_PORT_L5->CFGLR &= ~(0xf << (5 * 4));
-	CAPSENSE_SENSE_PORT_L5->CFGLR |= (GPIO_CNF_IN_FLOATING) << (5 * 4);
+	#ifdef CAPTOUCH_SENSE_PORT_L5
+	CAPTOUCH_SENSE_PORT_L5->CFGLR &= ~(0xf << (5 * 4));
+	CAPTOUCH_SENSE_PORT_L5->CFGLR |= (GPIO_CNF_IN_FLOATING) << (5 * 4);
 	#endif
-	#ifdef CAPSENSE_SENSE_PORT_L6
-	CAPSENSE_SENSE_PORT_L6->CFGLR &= ~(0xf << (6 * 4));
-	CAPSENSE_SENSE_PORT_L6->CFGLR |= (GPIO_CNF_IN_FLOATING) << (6 * 4);
+	#ifdef CAPTOUCH_SENSE_PORT_L6
+	CAPTOUCH_SENSE_PORT_L6->CFGLR &= ~(0xf << (6 * 4));
+	CAPTOUCH_SENSE_PORT_L6->CFGLR |= (GPIO_CNF_IN_FLOATING) << (6 * 4);
 	#endif
-	#ifdef CAPSENSE_SENSE_PORT_L7
-	CAPSENSE_SENSE_PORT_L7->CFGLR &= ~(0xf << (7 * 4));
-	CAPSENSE_SENSE_PORT_L7->CFGLR |= (GPIO_CNF_IN_FLOATING) << (7 * 4);
+	#ifdef CAPTOUCH_SENSE_PORT_L7
+	CAPTOUCH_SENSE_PORT_L7->CFGLR &= ~(0xf << (7 * 4));
+	CAPTOUCH_SENSE_PORT_L7->CFGLR |= (GPIO_CNF_IN_FLOATING) << (7 * 4);
 	#endif
 }
 
 
 
-static inline uint8_t capsense_sense(GPIO_TypeDef* port, uint8_t pin) {
-	CAPSENSE_PUSHPULL_PORT->BSHR = 1 << (CAPSENSE_PUSHPULL_PIN + 16);
+static inline uint8_t captouch_sense(GPIO_TypeDef* port, uint8_t pin) {
+	CAPTOUCH_PUSHPULL_PORT->BSHR = 1 << (CAPTOUCH_PUSHPULL_PIN + 16);
 	while (port->INDR & (1 << pin)) {
 		//__asm__("nop");
 	}
-	CAPSENSE_PUSHPULL_PORT->BSHR = 1 << CAPSENSE_PUSHPULL_PIN;
+	CAPTOUCH_PUSHPULL_PORT->BSHR = 1 << CAPTOUCH_PUSHPULL_PIN;
 	volatile uint32_t t_pushpull = SysTick->CNT;
 	while (!(port->INDR & (1 << pin))) {
 		//__asm__("nop");
 	}
 	t_pushpull = SysTick->CNT - t_pushpull;
-	CAPSENSE_PUSHPULL_PORT->BSHR = 1 << (CAPSENSE_PUSHPULL_PIN + 16);
-	return (t_pushpull < CAPSENSE_CEILING ? t_pushpull : CAPSENSE_CEILING);
+	CAPTOUCH_PUSHPULL_PORT->BSHR = 1 << (CAPTOUCH_PUSHPULL_PIN + 16);
+	return (t_pushpull < CAPTOUCH_CEILING ? t_pushpull : CAPTOUCH_CEILING);
 }
 
 
 
-static inline uint8_t capsense_offset(uint8_t value, uint8_t cal, uint8_t threshold) {
+static inline uint8_t captouch_offset(uint8_t value, uint8_t cal, uint8_t threshold) {
 	if (value > cal) {
 		uint8_t result = value - cal;
 		return (result > threshold ? result : 0);
@@ -195,12 +195,12 @@ static inline uint8_t capsense_offset(uint8_t value, uint8_t cal, uint8_t thresh
 
 
 
-static inline uint8_t capsense_discretize(uint8_t value, uint8_t discard_bits) {
+static inline uint8_t captouch_discretize(uint8_t value, uint8_t discard_bits) {
 	return ((value >> discard_bits) << discard_bits);
 }
 
 
-static inline uint8_t capsense_slider2(uint16_t value0, uint16_t value1, uint8_t threshold_contact) {
+static inline uint8_t captouch_slider2(uint16_t value0, uint16_t value1, uint8_t threshold_contact) {
 	uint16_t ratio;
 	uint16_t value_sum = value0 + value1;
 	// possible source of division instability when value_sum is small (= doesn't have much contact to finger)
@@ -212,7 +212,7 @@ static inline uint8_t capsense_slider2(uint16_t value0, uint16_t value1, uint8_t
 	return 0;
 }
 
-static inline void capsense_slider2_scroll(uint16_t value0, uint16_t value1, uint8_t threshold_contact, uint8_t* output, int16_t* memory, uint8_t threshold_change, uint8_t increment) {
+static inline void captouch_slider2_scroll(uint16_t value0, uint16_t value1, uint8_t threshold_contact, uint8_t* output, int16_t* memory, uint8_t threshold_change, uint8_t increment) {
 	uint16_t value_sum = value0 + value1;
 	uint16_t ratio;
 	// possible source of division instability when value_sum is small (= doesn't have much contact to finger)
@@ -234,7 +234,7 @@ static inline void capsense_slider2_scroll(uint16_t value0, uint16_t value1, uin
 	}
 }
 
-static inline uint8_t capsense_slider3(uint8_t value0, uint8_t value1, uint8_t value2, uint8_t threshold_contact) {
+static inline uint8_t captouch_slider3(uint8_t value0, uint8_t value1, uint8_t value2, uint8_t threshold_contact) {
 	uint16_t value_sum = value0 + value1 + value2;
 	uint16_t ratio;
 	uint16_t sum0;
@@ -250,7 +250,7 @@ static inline uint8_t capsense_slider3(uint8_t value0, uint8_t value1, uint8_t v
 	return 0;
 }
 
-static inline void capsense_slider3_scroll(uint8_t value0, uint8_t value1, uint8_t value2, uint8_t threshold_contact, uint8_t* output, int16_t* memory, uint8_t threshold_change, uint8_t increment) {
+static inline void captouch_slider3_scroll(uint8_t value0, uint8_t value1, uint8_t value2, uint8_t threshold_contact, uint8_t* output, int16_t* memory, uint8_t threshold_change, uint8_t increment) {
 	uint16_t value_sum = value0 + value1 + value2;
 	uint16_t ratio;
 	uint16_t sum0;
@@ -278,10 +278,10 @@ static inline void capsense_slider3_scroll(uint8_t value0, uint8_t value1, uint8
 
 
 
-static inline void capsense_filter(uint8_t* output, uint8_t input) {
+static inline void captouch_filter(uint8_t* output, uint8_t input) {
 	*output = (*output - (*output >> 6)) + input;
 }
-static inline void capsense_filter_2ndorder(uint8_t* output, uint8_t input) {
+static inline void captouch_filter_2ndorder(uint8_t* output, uint8_t input) {
 	*output = (*output - (*output >> 6)) + (*output - (*output >> 6)) + input;
 }
 

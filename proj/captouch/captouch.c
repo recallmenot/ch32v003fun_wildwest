@@ -12,13 +12,13 @@
 #error "please enable one of the demos"
 #endif
 
-#define CAPSENSE_PUSHPULL_PORT GPIOC
-#define CAPSENSE_PUSHPULL_PIN 7
-#define CAPSENSE_SENSE_N_LINES 3
-#define CAPSENSE_SENSE_PORT_L2 GPIOD
-#define CAPSENSE_SENSE_PORT_L5 GPIOC
-#define CAPSENSE_SENSE_PORT_L6 GPIOC
-#include "ch32v003_capsense.h"
+#define CAPTOUCH_PUSHPULL_PORT GPIOC
+#define CAPTOUCH_PUSHPULL_PIN 7
+#define CAPTOUCH_SENSE_N_LINES 3
+#define CAPTOUCH_SENSE_PORT_L2 GPIOD
+#define CAPTOUCH_SENSE_PORT_L5 GPIOC
+#define CAPTOUCH_SENSE_PORT_L6 GPIOC
+#include "ch32v003_captouch.h"
 
 #include <stdio.h>
 
@@ -64,23 +64,23 @@ int main()
 	Delay_Ms(3000);
 	LOG("3000ms wait over\r\n");
 
-	capsense_assign_pushpull();
-	capsense_assign_sense();
+	captouch_assign_pushpull();
+	captouch_assign_sense();
 
 	GPIOC->OUTDR |= (1 << 3);
 
 	//uint16_t counter = 0;
-	LOG("entering capsense loop\r\n");
+	LOG("entering captouch loop\r\n");
 
 	uint8_t result_line6;
 	uint8_t result_line5;
 	uint8_t result_line2;
 
-	uint8_t cal_line6 = capsense_sense(CAPSENSE_SENSE_PORT_L6, 6);
+	uint8_t cal_line6 = captouch_sense(CAPTOUCH_SENSE_PORT_L6, 6);
 	Delay_Ms(1);
-	uint8_t cal_line5 = capsense_sense(CAPSENSE_SENSE_PORT_L5, 5);
+	uint8_t cal_line5 = captouch_sense(CAPTOUCH_SENSE_PORT_L5, 5);
 	Delay_Ms(1);
-	uint8_t cal_line2 = capsense_sense(CAPSENSE_SENSE_PORT_L2, 2);
+	uint8_t cal_line2 = captouch_sense(CAPTOUCH_SENSE_PORT_L2, 2);
 
 	uint8_t slider_output = 0;
 	uint8_t slider_pre_output = 0;
@@ -98,23 +98,23 @@ int main()
 	uint32_t led_ctrl_t1 = 0;
 	for (;;) {
 		if (SysTick->CNT - schd_sense_t > SCHD_sense_i) {
-		#if SELECT_SLIDER2 == 1
+			#if SELECT_SLIDER2 == 1
 			switch (schd_sense_step) {
 				case 0:
-					//result_line6 = capsense_sense_pin(6);
-					result_line6 = capsense_offset(capsense_sense_pin(6), cal_line6, 8);
-					//capsense_filter(&result_line6, capsense_offset(capsense_sense_pin(6), cal_line6, 3));
+					//result_line6 = captouch_sense_pin(6);
+					result_line6 = captouch_offset(captouch_sense_pin(6), cal_line6, 8);
+					//captouch_filter(&result_line6, captouch_offset(captouch_sense_pin(6), cal_line6, 3));
 					schd_sense_step++;
 					break;
 				case 1:
-					//result_line5 = capsense_sense_pin(5);
-					result_line5 = capsense_offset(capsense_sense_pin(5), cal_line5, 8);
-					//capsense_filter(&result_line5, capsense_offset(capsense_sense_pin(5), cal_line5, 3));
+					//result_line5 = captouch_sense_pin(5);
+					result_line5 = captouch_offset(captouch_sense_pin(5), cal_line5, 8);
+					//captouch_filter(&result_line5, captouch_offset(captouch_sense_pin(5), cal_line5, 3));
 					schd_sense_step++;
 					break;
 				case 2:
-					capsense_slider2_scroll(result_line6, result_line5, 50, &slider_output, &slider_memory, 16, 8);
-					//slider_output = capsense_discretize(slider_output, 3);
+					captouch_slider2_scroll(result_line6, result_line5, 50, &slider_output, &slider_memory, 16, 8);
+					//slider_output = captouch_discretize(slider_output, 3);
 					schd_sense_step++;
 					break;
 				case 3:
@@ -128,24 +128,24 @@ int main()
 			/*
 			switch (schd_sense_step) {
 				case 0:
-					//result_line6 = capsense_sense_pin(6);
-					result_line6 = capsense_offset(capsense_sense(CAPSENSE_SENSE_PORT_L6, 6), cal_line6, 8);
-					//capsense_filter(&result_line6, capsense_offset(capsense_sense_pin(6), cal_line6, 3));
+					//result_line6 = captouch_sense_pin(6);
+					result_line6 = captouch_offset(captouch_sense(CAPTOUCH_SENSE_PORT_L6, 6), cal_line6, 8);
+					//captouch_filter(&result_line6, captouch_offset(captouch_sense_pin(6), cal_line6, 3));
 					schd_sense_step++;
 					break;
 				case 1:
-					result_line5 = capsense_offset(capsense_sense(CAPSENSE_SENSE_PORT_L5, 5), cal_line5, 8);
+					result_line5 = captouch_offset(captouch_sense(CAPTOUCH_SENSE_PORT_L5, 5), cal_line5, 8);
 					schd_sense_step++;
 					break;
 				case 2:
-					//result_line2 = capsense_sense_pin(2);
-					result_line2 = capsense_offset(capsense_sense(CAPSENSE_SENSE_PORT_L2, 2), cal_line2, 8);
-					//capsense_filter(&result_line2, capsense_offset(capsense_sense_pin(2), cal_line2, 3));
+					//result_line2 = captouch_sense_pin(2);
+					result_line2 = captouch_offset(captouch_sense(CAPTOUCH_SENSE_PORT_L2, 2), cal_line2, 8);
+					//captouch_filter(&result_line2, captouch_offset(captouch_sense_pin(2), cal_line2, 3));
 					schd_sense_step++;
 					break;
 				case 3:
-					slider_output = capsense_slider3(result_line6, result_line5, result_line2, 30);
-					//slider_output = capsense_discretize(slider_output, 3);
+					slider_output = captouch_slider3(result_line6, result_line5, result_line2, 30);
+					//slider_output = captouch_discretize(slider_output, 3);
 					schd_sense_step++;
 					break;
 				case 4:
@@ -158,34 +158,34 @@ int main()
 			}
 			*/
 			if (schd_sense_step == 0) {
-				//result_line6 = capsense_sense_pin(6);
-				result_line6 = capsense_offset(capsense_sense(CAPSENSE_SENSE_PORT_L6, 6), cal_line6, 8);
-				//capsense_filter(&result_line6, capsense_offset(capsense_sense_pin(6), cal_line6, 3));
+				//result_line6 = captouch_sense_pin(6);
+				result_line6 = captouch_offset(captouch_sense(CAPTOUCH_SENSE_PORT_L6, 6), cal_line6, 8);
+				//captouch_filter(&result_line6, captouch_offset(captouch_sense_pin(6), cal_line6, 3));
 				schd_sense_step++;
 
 			}
 			else if (schd_sense_step == 1) {
-				result_line5 = capsense_offset(capsense_sense(CAPSENSE_SENSE_PORT_L5, 5), cal_line5, 8);
+				result_line5 = captouch_offset(captouch_sense(CAPTOUCH_SENSE_PORT_L5, 5), cal_line5, 8);
 				schd_sense_step++;
 
 			}
 			else if (schd_sense_step == 2) {
-				//result_line2 = capsense_sense_pin(2);
-				result_line2 = capsense_offset(capsense_sense(CAPSENSE_SENSE_PORT_L2, 2), cal_line2, 8);
-				//capsense_filter(&result_line2, capsense_offset(capsense_sense_pin(2), cal_line2, 3));
+				//result_line2 = captouch_sense_pin(2);
+				result_line2 = captouch_offset(captouch_sense(CAPTOUCH_SENSE_PORT_L2, 2), cal_line2, 8);
+				//captouch_filter(&result_line2, captouch_offset(captouch_sense_pin(2), cal_line2, 3));
 				schd_sense_step++;
 
 			}
 			else if (schd_sense_step == 3) {
-				//slider_output = capsense_slider3(result_line6, result_line5, result_line2, 30);
-				capsense_slider3_scroll(result_line6, result_line5, result_line2, 30, &slider_output, &slider_memory, 4, 4);
-				//slider_output = capsense_discretize(slider_output, 3);
+				//slider_output = captouch_slider3(result_line6, result_line5, result_line2, 30);
+				captouch_slider3_scroll(result_line6, result_line5, result_line2, 30, &slider_output, &slider_memory, 4, 4);
+				//slider_output = captouch_discretize(slider_output, 3);
 				
 				schd_sense_step++;
 
 			}
 			else if (schd_sense_step >= 4) {
-				//capsense_filter(&slider_output, slider_pre_output);
+				//captouch_filter(&slider_output, slider_pre_output);
 				led_ctrl_t0 = (slider_output >> 2) * DELAY_US_TIME;		// on-time
 				led_ctrl_t1 = ((255 - slider_output) >> 2) * DELAY_US_TIME;	// off-time
 				schd_sense_step = 0;
