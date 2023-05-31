@@ -38,6 +38,61 @@
 /* somehow this ISR won't get called??
 */
 
+
+void t2pwm_init( void )
+{
+	// Enable GPIOD and TIM2
+	RCC->APB2PCENR |= RCC_APB2Periph_GPIOD;
+	RCC->APB1PCENR |= RCC_APB1Periph_TIM2;
+
+	// PD4 is T2CH1, 10MHz Output alt func, push-pull
+	GPIOD->CFGLR &= ~(0xf<<(4*4));
+	GPIOD->CFGLR |= (GPIO_Speed_10MHz | GPIO_CNF_OUT_PP_AF)<<(4*4);
+	
+	// Reset TIM2 to init all regs
+	RCC->APB1PRSTR |= RCC_APB1Periph_TIM2;
+	RCC->APB1PRSTR &= ~RCC_APB1Periph_TIM2;
+	
+	// SMCFGR: default clk input is CK_INT
+	// set TIM2 clock prescaler divider 
+	TIM2->PSC = 0x0000;
+	// set PWM total cycle width
+	TIM2->ATRLR = 255;
+	
+	// for channel 1 and 2, let CCxS stay 00 (output), set OCxM to 110 (PWM I)
+	// enabling preload causes the new pulse width in compare capture register only to come into effect when UG bit in SWEVGR is set (= initiate update) (auto-clears)
+	TIM2->CHCTLR1 |= TIM_OC1M_2 | TIM_OC1M_1 | TIM_OC1PE;
+
+	// CTLR1: default is up, events generated, edge align
+	// enable auto-reload of preload
+	TIM2->CTLR1 |= TIM_ARPE;
+
+	// Enable CH1 output, positive pol
+	TIM2->CCER |= TIM_CC1E | TIM_CC1P;
+
+	// initialize counter
+	TIM2->SWEVGR |= TIM_UG;
+
+	// Enable TIM2
+	TIM2->CTLR1 |= TIM_CEN;
+}
+
+
+/*
+ * set timer channel PW
+ */
+void t2pwm_setpw(uint8_t chl, uint16_t width)
+{
+	switch(chl&3)
+	{
+		case 0: TIM2->CH1CVR = width; break;
+		case 1: TIM2->CH2CVR = width; break;
+		case 2: TIM2->CH3CVR = width; break;
+		case 3: TIM2->CH4CVR = width; break;
+	}
+	TIM2->SWEVGR |= TIM_UG; // load new value in compare capture register
+}
+
 int main()
 {
 	SystemInit48HSI();
@@ -50,15 +105,13 @@ int main()
 	RCC->APB2PCENR |= RCC_APB2Periph_GPIOD;
 	RCC->APB2PCENR |= RCC_APB2Periph_GPIOC;
 
-	// GPIO C3 Push-Pull
-	GPIOC->CFGLR &= ~(0xf<<(3*4));
-	GPIOC->CFGLR |= (GPIO_Speed_10MHz | GPIO_CNF_OUT_PP)<<(3*4);
-	GPIOC->OUTDR |= (1 << 3);
+	// GPIO D4 timer2 PWM for LED
+	t2pwm_init();
 
 	// GPIO C4 Push-Pull
 	GPIOC->CFGLR &= ~(0xf<<(4*4));
 	GPIOC->CFGLR |= (GPIO_Speed_10MHz | GPIO_CNF_OUT_PP)<<(4*4);
-	GPIOC->OUTDR |= (1 << 4);
+	GPIOC->BSHR = (1 << 4);
 
 	// give the user time to open the terminal connection
 	Delay_Ms(3000);
@@ -71,6 +124,7 @@ int main()
 
 	//uint16_t counter = 0;
 	LOG("entering captouch loop\r\n");
+	GPIOC->BSHR = (1 << (16 + 4));
 
 	uint8_t result_line6;
 	uint8_t result_line5;
@@ -159,26 +213,26 @@ int main()
 			*/
 			if (schd_sense_step == 0) {
 				//result_line6 = captouch_sense_pin(6);
-				result_line6 = captouch_offset(captouch_sense(CAPTOUCH_SENSE_PORT_L6, 6), cal_line6, 8);
+				result_line6 = captouch_offset(captouch_sense(CAPTOUCH_SENSE_PORT_L6, 6), cal_line6, 5);
 				//captouch_filter(&result_line6, captouch_offset(captouch_sense_pin(6), cal_line6, 3));
 				schd_sense_step++;
 
 			}
 			else if (schd_sense_step == 1) {
-				result_line5 = captouch_offset(captouch_sense(CAPTOUCH_SENSE_PORT_L5, 5), cal_line5, 8);
+				result_line5 = captouch_offset(captouch_sense(CAPTOUCH_SENSE_PORT_L5, 5), cal_line5, 5);
 				schd_sense_step++;
 
 			}
 			else if (schd_sense_step == 2) {
 				//result_line2 = captouch_sense_pin(2);
-				result_line2 = captouch_offset(captouch_sense(CAPTOUCH_SENSE_PORT_L2, 2), cal_line2, 8);
+				result_line2 = captouch_offset(captouch_sense(CAPTOUCH_SENSE_PORT_L2, 2), cal_line2, 5);
 				//captouch_filter(&result_line2, captouch_offset(captouch_sense_pin(2), cal_line2, 3));
 				schd_sense_step++;
 
 			}
 			else if (schd_sense_step == 3) {
 				//slider_output = captouch_slider3(result_line6, result_line5, result_line2, 30);
-				captouch_slider3_scroll(result_line6, result_line5, result_line2, 30, &slider_output, &slider_memory, 4, 4);
+				captouch_slider3_scroll(result_line6, result_line5, result_line2, 30, &slider_output, &slider_memory, 4, 1);
 				//slider_output = captouch_discretize(slider_output, 3);
 				
 				schd_sense_step++;
@@ -186,13 +240,13 @@ int main()
 			}
 			else if (schd_sense_step >= 4) {
 				//captouch_filter(&slider_output, slider_pre_output);
-				led_ctrl_t0 = (slider_output >> 2) * DELAY_US_TIME;		// on-time
-				led_ctrl_t1 = ((255 - slider_output) >> 2) * DELAY_US_TIME;	// off-time
+				t2pwm_setpw(0, slider_output);
 				schd_sense_step = 0;
 			}
 			#endif
 			schd_sense_t = SysTick->CNT;
 		}
+		/*
 		if (SysTick->CNT - schd_led_t > schd_led_i) {
 			switch (schd_led_step) {
 				case 0:
@@ -211,6 +265,7 @@ int main()
 			}
 			schd_led_t = SysTick->CNT;
 		}
+		*/
 		if (SysTick->CNT - schd_log_t > SCHD_log_i) {
 			#if SELECT_SLIDER2 == 1
 			LOG("%03u %03u %03u\r\n", result_line6, result_line5, slider_output);
