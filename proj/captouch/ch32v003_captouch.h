@@ -9,7 +9,9 @@
 
 // maintenance includes
 #ifndef CAPTOUCH_PUSHPULL_PORT
+#define SYSTEM_CORE_CLOCK 480000000
 #include"../../ch32v003fun/ch32v003fun.h"
+
 #endif
 
 
@@ -94,6 +96,27 @@ to have captouch_enter() automatically restore the HSI speed to 48MHz after stan
 
 //######## preprocessor macros
 
+void captouch_delay_systick_interruptible(uint32_t n, uint8_t* event) {
+	uint32_t targend = SysTick->CNT + n;
+	while( ((int32_t)( SysTick->CNT - targend )) < 0 ) {
+		if (*event) {
+			break;
+		}
+	}
+	*event = 0;
+}
+
+/*
+void DelaySysTick( uint32_t n )
+{
+	uint32_t targend = SysTick->CNT + n;
+	while( ((int32_t)( SysTick->CNT - targend )) < 0 );
+}
+*/
+
+#define captouch_Delay_Us(n, event) captouch_delay_systick_interruptible( ((n) * DELAY_US_TIME), event)
+#define captouch_Delay_Ms(n, event) captouch_delay_systick_interruptible( ((n) * DELAY_MS_TIME), event)
+
 // maintenance defines
 #ifndef CAPTOUCH_PUSHPULL_PORT
 #define CAPTOUCH_PUSHPULL_PORT GPIOC
@@ -113,6 +136,8 @@ to have captouch_enter() automatically restore the HSI speed to 48MHz after stan
 
 //######## internal variables
 
+volatile uint32_t captouch_t_discharged;
+volatile uint8_t captouch_pcint_fired = 0;
 
 
 
@@ -127,66 +152,158 @@ static inline void captouch_assign_pushpull() {
 	CAPTOUCH_PUSHPULL_PORT->BSHR = (1 << (CAPTOUCH_PUSHPULL_PIN + 16));
 }
 
+
+// ternary expressions can evaluate pointers unlike _Generic and *should* also be evaluated at compile-time
+#define port_to_portnumber(port)	(((port) == GPIOA) ? 0b00 : \
+					(((port) == GPIOC) ? 0b10 : 0b11))
+
+#define portnumber_to_port(port) _Generic((port), \
+	0b00: GPIOA, \
+	0b10: GPIOB, \
+	0b11: GPIOC \
+)
+
+
+#define captouch_cfg_pc_interrupt(port, pin) ({ \
+	AFIO->EXTICR |= port_to_portnumber(port) << (pin * 2); \
+	EXTI->FTENR |= 1 << pin; \
+})
+
+// sense pin is charged to VDD by default
+#define captouch_cfg_pin_charge(port, pin) ({ \
+	port->CFGLR &= ~(0xf << (pin * 4)); \
+	port->CFGLR |= (GPIO_Speed_50MHz | GPIO_CNF_OUT_PP) << (pin * 4); \
+	port->BSHR = (1 << (pin)); \
+})
+
+
+
+
 static inline void captouch_assign_sense() {
-	// enable the correct GPIO port register
-	// sense as input, floating
+	// enable AFIO to be able to route pins to EXTI of PFIC
+	RCC->APB2PCENR |= RCC_AFIOEN;
 	#ifdef CAPTOUCH_SENSE_PORT_L0
-	CAPTOUCH_SENSE_PORT_L0->CFGLR &= ~(0xf << (0 * 4));
-	CAPTOUCH_SENSE_PORT_L0->CFGLR |= (GPIO_CNF_IN_FLOATING) << (0 * 4);
+	// enable the correct GPIO port register
+	captouch_cfg_pin_charge(CAPTOUCH_SENSE_PORT_L0, 0);
+	captouch_cfg_pc_interrupt(CAPTOUCH_SENSE_PORT_L0, 0);
 	#endif
 	#ifdef CAPTOUCH_SENSE_PORT_L1
-	CAPTOUCH_SENSE_PORT_L1->CFGLR &= ~(0xf << (1 * 4));
-	CAPTOUCH_SENSE_PORT_L1->CFGLR |= (GPIO_CNF_IN_FLOATING) << (1 * 4);
+	captouch_cfg_pin_charge(CAPTOUCH_SENSE_PORT_L1, 1);
+	captouch_cfg_pc_interrupt(CAPTOUCH_SENSE_PORT_L1, 1);
 	#endif
 	#ifdef CAPTOUCH_SENSE_PORT_L2
-	CAPTOUCH_SENSE_PORT_L2->CFGLR &= ~(0xf << (2 * 4));
-	CAPTOUCH_SENSE_PORT_L2->CFGLR |= (GPIO_CNF_IN_FLOATING) << (2 * 4);
+	captouch_cfg_pin_charge(CAPTOUCH_SENSE_PORT_L2, 2);
+	captouch_cfg_pc_interrupt(CAPTOUCH_SENSE_PORT_L2, 2);
 	#endif
 	#ifdef CAPTOUCH_SENSE_PORT_L3
-	CAPTOUCH_SENSE_PORT_L3->CFGLR &= ~(0xf << (3 * 4));
-	CAPTOUCH_SENSE_PORT_L3->CFGLR |= (GPIO_CNF_IN_FLOATING) << (3 * 4);
+	captouch_cfg_pin_charge(CAPTOUCH_SENSE_PORT_L3, 3);
+	captouch_cfg_pc_interrupt(CAPTOUCH_SENSE_PORT_L3, 3);
 	#endif
 	#ifdef CAPTOUCH_SENSE_PORT_L4
-	CAPTOUCH_SENSE_PORT_L4->CFGLR &= ~(0xf << (4 * 4));
-	CAPTOUCH_SENSE_PORT_L4->CFGLR |= (GPIO_CNF_IN_FLOATING) << (4 * 4);
+	captouch_cfg_pin_charge(CAPTOUCH_SENSE_PORT_L4, 4);
+	captouch_cfg_pc_interrupt(CAPTOUCH_SENSE_PORT_L4, 4);
 	#endif
 	#ifdef CAPTOUCH_SENSE_PORT_L5
-	CAPTOUCH_SENSE_PORT_L5->CFGLR &= ~(0xf << (5 * 4));
-	CAPTOUCH_SENSE_PORT_L5->CFGLR |= (GPIO_CNF_IN_FLOATING) << (5 * 4);
+	captouch_cfg_pin_charge(CAPTOUCH_SENSE_PORT_L5, 5);
+	captouch_cfg_pc_interrupt(CAPTOUCH_SENSE_PORT_L5, 5);
 	#endif
 	#ifdef CAPTOUCH_SENSE_PORT_L6
-	CAPTOUCH_SENSE_PORT_L6->CFGLR &= ~(0xf << (6 * 4));
-	CAPTOUCH_SENSE_PORT_L6->CFGLR |= (GPIO_CNF_IN_FLOATING) << (6 * 4);
+	captouch_cfg_pin_charge(CAPTOUCH_SENSE_PORT_L6, 6);
+	captouch_cfg_pc_interrupt(CAPTOUCH_SENSE_PORT_L6, 6);
 	#endif
 	#ifdef CAPTOUCH_SENSE_PORT_L7
-	CAPTOUCH_SENSE_PORT_L7->CFGLR &= ~(0xf << (7 * 4));
-	CAPTOUCH_SENSE_PORT_L7->CFGLR |= (GPIO_CNF_IN_FLOATING) << (7 * 4);
+	captouch_cfg_pin_charge(CAPTOUCH_SENSE_PORT_L7, 7);
+	captouch_cfg_pc_interrupt(CAPTOUCH_SENSE_PORT_L7, 7);
 	#endif
 }
 
+// bit		0 | 1 | 2  |  3  | 4  |  5  | 6  .. 22 | 23 .. 28
+// IRQn		2 | 3 | 12 | res | 14 | res | 16 .. 31 | 32 .. 38
+RV_STATIC_INLINE uint32_t NVIC_get_enabled_IRQs()
+{
+	return ( ((NVIC->ISR[0] >> 2) & 0b11) | ((NVIC->ISR[0] >> 12) << 2) | ((NVIC->ISR[1] & 0b1111111) << 23) );
+}
 
+RV_STATIC_INLINE void NVIC_clear_all_IRQs()
+{
+	NVIC->IRER[0] = ~0;
+	NVIC->IRER[1] = ~0;
+}
 
-static inline uint8_t captouch_sense(GPIO_TypeDef* port, uint8_t pin) {
-	CAPTOUCH_PUSHPULL_PORT->BSHR = 1 << (CAPTOUCH_PUSHPULL_PIN + 16);
-	while (port->INDR & (1 << pin)) {
-		//__asm__("nop");
-	}
-	CAPTOUCH_PUSHPULL_PORT->BSHR = 1 << CAPTOUCH_PUSHPULL_PIN;
-	volatile uint32_t t_pushpull = SysTick->CNT;
-	while (!(port->INDR & (1 << pin))) {
-		//__asm__("nop");
-	}
-	t_pushpull = SysTick->CNT - t_pushpull;
-	CAPTOUCH_PUSHPULL_PORT->BSHR = 1 << (CAPTOUCH_PUSHPULL_PIN + 16);
-	return (t_pushpull < CAPTOUCH_CEILING ? t_pushpull : CAPTOUCH_CEILING);
+RV_STATIC_INLINE void NVIC_restore_IRQs(uint32_t old_state)
+{
+	NVIC->IENR[0] = (old_state >> 2) << 12;
+	NVIC->IENR[1] = old_state >> 23;
+}
+
+// special delay function that can end either when target SysTick is reached or event becomes 1 (by interrupt)
+void EXTI7_0_IRQHandler( void ) __attribute__((interrupt));
+void EXTI7_0_IRQHandler( void ) 
+{
+	captouch_t_discharged = SysTick->CNT;
+	// notify delay_systick_interruptible it can stop
+	captouch_pcint_fired = 1;
+	// obligatory interrupt acknowledge
+	EXTI->INTFR = ~0;
+}
+
+uint16_t captouch_sense(GPIO_TypeDef* port, uint8_t pin) {
+	volatile uint32_t t_pull;
+	// disable all IRQs besides EXTI7_0
+	uint32_t IRQ_backup = NVIC_get_enabled_IRQs();
+	NVIC_clear_all_IRQs();
+	NVIC_EnableIRQ(EXTI7_0_IRQn);
+	// elevate EXT7_0 interrupt priority
+	NVIC_SetPriority(EXTI7_0_IRQn, ((1<<7) | (0<<6) | (1<<4)));
+	// register pin for pin change interrupt
+	EXTI->INTENR |= 1 << pin;
+	// let external pulldown resistor slowly discharge pin by turning it into a Hi-Z input
+	port->CFGLR &= ~(0xf << (pin * 4));
+	port->CFGLR |= ((GPIO_CNF_IN_FLOATING) << (pin * 4));
+	// store when the pin discharge started
+	t_pull = SysTick->CNT;
+	// wait 255 Ticks (42.5ns @ core clock / 8), 
+	DelaySysTick(255);
+	// EXTI7_0 will surely have fired and recorded the time to discharge the pin by now
+	// restore old IRQ config from backup
+	NVIC_restore_IRQs(IRQ_backup);
+	// register pin for pin change interrupt
+	EXTI->INTENR &= ~(1 << pin);
+	// restore EXT7_0 interrupt priority to normal level
+	NVIC_SetPriority(EXTI7_0_IRQn, 0);
+	// recharge pin for next time
+	captouch_cfg_pin_charge(port, pin);
+	// calculate time to discharge
+	;
+	return t_pull = captouch_t_discharged - t_pull;
 }
 
 
+/*
+static inline uint8_t captouch_sense(GPIO_TypeDef* port, uint8_t pin) {
+	volatile uint32_t t_pull;
+	__disable_irq();
+	port->CFGLR &= ~(0xf << (pin * 4));
+	port->CFGLR |= ((GPIO_CNF_IN_FLOATING) << (pin * 4));
+	t_pull = SysTick->CNT;
+	while ((port->INDR & (1 << pin))) {
+		//__asm__("nop");
+	}
+	t_pull = SysTick->CNT - t_pull;
+	__enable_irq();
+	port->CFGLR &= ~(0xf << (pin * 4));
+	port->CFGLR |= ((GPIO_Speed_50MHz | GPIO_CNF_OUT_PP) << (pin * 4));
+	port->BSHR = (1 << (pin));
+	return (t_pull < CAPTOUCH_CEILING ? t_pull : CAPTOUCH_CEILING);
+}
+*/
 
-static inline uint8_t captouch_offset(uint8_t value, uint8_t cal, uint8_t threshold) {
+static inline uint8_t captouch_value_clean(uint16_t value, uint8_t cal, uint8_t threshold) {
 	if (value > cal) {
 		uint8_t result = value - cal;
-		return (result > threshold ? result : 0);
+		return (result > threshold ?
+			(result < CAPTOUCH_CEILING ? result : CAPTOUCH_CEILING)
+	  		: 0);
 	}
 	else {
 		return 0;
