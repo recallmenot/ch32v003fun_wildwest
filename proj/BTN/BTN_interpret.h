@@ -118,6 +118,7 @@ enum BTNi_states BTNi_interpret_state(uint8_t button_pressed, uint32_t* time_mem
 	}
 	return BTNi_state_open;
 }
+// hide functionalities behind the interval defines?
 // double-press needs upstroke detection?
 
 

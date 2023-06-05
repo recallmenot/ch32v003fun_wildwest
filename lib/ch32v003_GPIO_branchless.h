@@ -5,6 +5,7 @@
 #define CH32V003_GPIO_BR_H
 
 // includes
+#include <cstddef>
 #include <stdint.h>								//uintN_t support
 #include "../ch32v003fun/ch32v003fun.h"
 
@@ -51,70 +52,79 @@ this unlocks the GPIO_from_pinNumber function you can use to derive the desired 
 2 .. 9		C0 .. C7
 10..17		D0 .. D7
 
+
+By default, this library inserts a delay of 300 µs between configureation of the ADC input mux and the time the conversion starts.
+This serves to counteract the high input impedance of the ADC, especially if it is increased by external resistors.
+The input impedance of port A appears to be especially large.
+You can modify it to your liking using the following define before including this library.
+#define GPIO_ADC_MUX_DELAY 1200
+
+The ADC on CH32V003 is a capacitive sampler.
+GPIO_ADC_sampletime controls the time each conversion is granted, by default it is GPIO_ADC_sampletime_241cy_default, all options come from the GPIO_ADC_sampletimes enum.
+To alter it, you have 3 options:
+ * `#define GPIO_ADC_sampletime GPIO_ADC_sampletime_43cy` before including this library
+ * call the GPIO_ADC_set_sampletime function-like macro to momentarrily set it for one channel
+ * call the GPIO_ADC_set_sampletimes_all function-like macro to to momentarrily set it for all channels
+
 */
 
 
 
 //######## pins and states: use these for the functions below!
 
-// GPIO ports (for enabling)
-#define GPIO_port_EN_A RCC_APB2Periph_GPIOA
-#define GPIO_port_EN_C RCC_APB2Periph_GPIOC
-#define GPIO_port_EN_D RCC_APB2Periph_GPIOD
-
-// GPIO pin modes
-#define GPIO_pinMode_I_floating		GPIO_CNF_IN_FLOATING
-#define GPIO_pinMode_I_pullUp		GPIO_CNF_IN_PUPD	| 0b00110000		//pull-mode + BSHR(1)
-#define GPIO_pinMode_I_pullDown		GPIO_CNF_IN_PUPD	| 0b00010000		//pull-mode + BSHR(0)
-#define GPIO_pinMode_I_analog		GPIO_CNF_IN_ANALOG
-#define GPIO_pinMode_O_pushPull		GPIO_CNF_OUT_PP		| GPIO_Speed_10MHz
-#define GPIO_pinMode_O_openDrain	GPIO_CNF_OUT_OD		| GPIO_Speed_10MHz
-#define GPIO_pinMode_O_pushPullMux	GPIO_CNF_OUT_PP_AF	| GPIO_Speed_10MHz
-#define GPIO_pinMode_O_openDrainMux	GPIO_CNF_OUT_OD_AF	| GPIO_Speed_10MHz
-// bit layout 00TPMMMM
-// P enables pull resistors, T sets pull resistors high / low
-
-// GPIO pins, use for all functions!
-#define GPIO_pin_A1	(GPIOA_BASE + 1)
-#define GPIO_pin_A2	(GPIOA_BASE + 2)
-#define GPIO_pin_C0	(GPIOC_BASE + 0)
-#define GPIO_pin_C1	(GPIOC_BASE + 1)
-#define GPIO_pin_C2	(GPIOC_BASE + 2)
-#define GPIO_pin_C3	(GPIOC_BASE + 3)
-#define GPIO_pin_C4	(GPIOC_BASE + 4)
-#define GPIO_pin_C5	(GPIOC_BASE + 5)
-#define GPIO_pin_C6	(GPIOC_BASE + 6)
-#define GPIO_pin_C7	(GPIOC_BASE + 7)
-#define GPIO_pin_D0	(GPIOD_BASE + 0)
-#define GPIO_pin_D1	(GPIOD_BASE + 1)
-#define GPIO_pin_D2	(GPIOD_BASE + 2)
-#define GPIO_pin_D3	(GPIOD_BASE + 3)
-#define GPIO_pin_D4	(GPIOD_BASE + 4)
-#define GPIO_pin_D5	(GPIOD_BASE + 5)
-#define GPIO_pin_D6	(GPIOD_BASE + 6)
-#define GPIO_pin_D7	(GPIOD_BASE + 7)
-
-// GPIO pins, for iterator boundaries only!
-enum GPIO_pinNumbers{
-	GPIO_pinNumber_A1,
-	GPIO_pinNumber_A2,
-	GPIO_pinNumber_C0,
-	GPIO_pinNumber_C1,
-	GPIO_pinNumber_C2,
-	GPIO_pinNumber_C3,
-	GPIO_pinNumber_C4,
-	GPIO_pinNumber_C5,
-	GPIO_pinNumber_C6,
-	GPIO_pinNumber_C7,
-	GPIO_pinNumber_D0,
-	GPIO_pinNumber_D1,
-	GPIO_pinNumber_D2,
-	GPIO_pinNumber_D3,
-	GPIO_pinNumber_D4,
-	GPIO_pinNumber_D5,
-	GPIO_pinNumber_D6,
-	GPIO_pinNumber_D7,
+enum GPIO_port_n {
+	GPIO_port_A = 0b00,
+	GPIO_port_C = 0b10,
+	GPIO_port_D = 0b11,
 };
+
+#define GPIOx_to_port_n(GPIOx)				\
+	((GPIOx == GPIOA)	?	0b00	:	\
+	((GPIOx == GPIOC)	?	0b10	:	\
+	((GPIOx == GPIOD)	?	0b11	:	\
+					NULL	)))
+
+#define GPIO_port_n_to_GPIOx(GPIO_port_n)		\
+	((GPIO_port_n == 0b00)	?	GPIOA	:	\
+	((GPIO_port_n == 0b10)	?	GPIOC	:	\
+	((GPIO_port_n == 0b11)	?	GPIOD	:	\
+					NULL	)))
+
+#define GPIO_port_n_to_RCC_APB2Periph(GPIO_port_n)			\
+	((GPIO_port_n == 0b00)	?	RCC_APB2Periph_GPIOA	:	\
+	((GPIO_port_n == 0b10)	?	RCC_APB2Periph_GPIOC	:	\
+	((GPIO_port_n == 0b11)	?	RCC_APB2Periph_GPIOD	:	\
+					NULL			)))
+
+
+
+enum GPIO_pinModes {
+	GPIO_pinMode_I_floating,
+	GPIO_pinMode_I_pullUp,
+	GPIO_pinMode_I_pullDown,
+	GPIO_pinMode_I_analog,
+	GPIO_pinMode_O_pushPull,
+	GPIO_pinMode_O_openDrain,
+	GPIO_pinMode_O_pushPullMux,
+	GPIO_pinMode_O_openDrainMux,
+};
+
+#define GPIO_pinMode_to_CFG(GPIO_pinMode, GPIOSpeed)									\
+	((GPIO_pinMode == GPIO_pinMode_I_floating)	?	(GPIO_SPEED_IN	| GPIO_CNF_IN_FLOATING)		:	\
+	((GPIO_pinMode == GPIO_pinMode_I_pullUp)	?	(GPIO_SPEED_IN	| GPIO_CNF_IN_PUPD)		:	\
+	((GPIO_pinMode == GPIO_pinMode_I_pullDown)	?	(GPIO_SPEED_IN	| GPIO_CNF_IN_PUPD)		:	\
+	((GPIO_pinMode == GPIO_pinMode_I_analog)	?	(GPIO_SPEED_IN	| GPIO_CNF_IN_ANALOG)		:	\
+	((GPIO_pinMode == GPIO_pinMode_O_pushPull)	?	(GPIOSpeed	| GPIO_CNF_OUT_PP)		:	\
+	((GPIO_pinMode == GPIO_pinMode_O_openDrain)	?	(GPIOSpeed	| GPIO_CNF_OUT_OD)		:	\
+	((GPIO_pinMode == GPIO_pinMode_O_pushPullMux)	?	(GPIOSpeed	| GPIO_CNF_OUT_PP_AF)		:	\
+	((GPIO_pinMode == GPIO_pinMode_O_openDrainMux)	?	(GPIOSpeed	| GPIO_CNF_IN_ANALOG)		:	\
+  								NULL						))))))))
+
+#define GPIO_pinMode_set_PUPD(GPIO_pinMode, GPIO_port_n, pin) 										\
+	((GPIO_pinMode == GPIO_pinMode_I_pullUp)	? 	(GPIO_port_n_to_GPIOx(port)->BSHR = (1 << pin))			:	\
+	((GPIO_pinMode == GPIO_pinMode_I_pullDown)	?	(GPIO_port_n_to_GPIOx(port)->BSHR = (1 << (pin + 16)))		:	\
+								NULL								))
+
 
 enum lowhigh {
 	low,
@@ -147,45 +157,15 @@ enum GPIO_ADC_sampletimes {
 	GPIO_ADC_sampletime_241cy_default,
 };
 
-enum GPIO_ports{
-	GPIO_port_A,
-	GPIO_port_C,
-	GPIO_port_D,
-	GPIO_port_none,
-};
-
 
 
 //######## function overview (declarations): use these!
 
-static inline void GPIO_portEnable(uint32_t port_EN) __attribute__((used));
-
-static inline void GPIO_pinMode (uint32_t pin, uint8_t pinMode);
-
-static inline void GPIO_digitalWrite_hi(uint32_t pin);				// completely branchless -> maximum speed
-static inline void GPIO_digitalWrite_lo(uint32_t pin);				// completely branchless -> maximum speed
-static inline void GPIO_digitalWrite(uint32_t pin, enum lowhigh direction);
-
-static inline uint8_t GPIO_digitalRead(uint32_t pin);				// completely branchless -> maximum speed
-
-
-static inline void GPIO_ADCinit();
-static inline void GPIO_ADC_set_sampletime(enum GPIO_analog_inputs input, enum GPIO_ADC_sampletimes time);
-static inline void GPIO_ADC_set_power(uint8_t enable);
-static inline void GPIO_ADC_calibrate();
-
-static inline uint16_t GPIO_analogRead(enum GPIO_analog_inputs input);
-
-// helper for easy addressing of pins with an iterator (for-loop, while-loop)
-// enable with #define CH32V003_GPIO_ITER_IMPLEMENTATION before the #include
-// only function that expects a pinNumber (see enum above)
-static inline uint32_t GPIO_from_pinNumber(uint8_t pinNumber);
 
 
 
 //######## internal function declarations
 
-enum GPIO_ports GPIO_getPort (uint32_t pin);
 
 
 //######## internal variables
@@ -194,10 +174,14 @@ enum GPIO_ports GPIO_getPort (uint32_t pin);
 
 //######## preprocessor macros
 
-#define GPIO_get_pin_PORTX_REG(pin) ((GPIO_TypeDef*)(uintptr_t)(pin & (~0b1111)))
-#define GPIO_get_pin_N(pin) (pin & 0b1111)
-#define GPIO_get_pull_en(pinMode) (pinMode >> 4) & 0b1
-#define GPIO_get_pull_direction(pinMode) (pinMode >> 5) & 0b1
+#if !defined(GPIO_ADC_MUX_DELAY)
+#define GPIO_ADC_MUX_DELAY 200
+#endif
+
+#if !defined(GPIO_ADC_sampletime)
+#define GPIO_ADC_sampletime GPIO_ADC_sampletime_241cy_default
+#endif
+
 
 
 
@@ -207,43 +191,64 @@ enum GPIO_ports GPIO_getPort (uint32_t pin);
 
 //######## small function definitions, static inline
 
-// __attribute__((used)) is needed in the declaration so compiler doesn't optimize this into oblivion
-static inline void GPIO_portEnable(uint32_t port_EN) {
-	RCC->APB2PCENR |= port_EN;
-}
+#define GPIO_port_enable(GPIO_port_n) RCC->APB2PCENR |= GPIO_port_n_to_RCC_APB2Periph(GPIO_port_n);
 
-static inline void GPIO_pinMode (uint32_t pin, uint8_t pinMode) {
-	// zero the 4 configuration bits
-	GPIO_get_pin_PORTX_REG(pin)->CFGLR &= ~(0b1111 << (4 * GPIO_get_pin_N(pin)));
-	// write the correct 4 configuration bits
-	GPIO_get_pin_PORTX_REG(pin)->CFGLR |= (0b1111 & pinMode) << (4 * GPIO_get_pin_N(pin));
-	// set output state if pushhigh if pullup, else down
-	if (GPIO_get_pull_en(pinMode)) {
-		GPIO_get_pin_PORTX_REG(pin)->BSHR = GPIO_get_pull_direction(pinMode) << GPIO_get_pin_N(pin);
-	}
-}
+#define GPIO_pin_mode(GPIO_port_n, pin, pinMode, output_speed) ({					\
+	GPIO_port_n_to_GPIOx(GPIO_port_n)->CFGLR &= ~(0b1111 << (4 * pin));				\
+	GPIO_port_n_to_GPIOx(GPIO_port_n)->CFGLR |= GPIO_pinMode_to_CFG(pinMode, ouput_speed);		\
+	GPIO_pinMode_set_PUPD(GPIO_port_n, pin);							\
+})
 
-static inline void GPIO_digitalWrite_hi(uint32_t pin) {
-	GPIO_get_pin_PORTX_REG(pin)->BSHR = 1 << GPIO_get_pin_N(pin);
-}
-static inline void GPIO_digitalWrite_lo(uint32_t pin) {
-	GPIO_get_pin_PORTX_REG(pin)->BSHR = 1 << (GPIO_get_pin_N(pin) + 16);
-} 
-static inline void GPIO_digitalWrite(uint32_t pin, enum lowhigh direction) {
-	// no checks given whether pin is currently being toggled by timer! your output trannys are in your hands! beware the magic smoke!
-	if (direction) {
-		GPIO_digitalWrite_hi(pin);
-	}
-	else {
-		GPIO_digitalWrite_lo(pin);
-	}
-}
+#define GPIO_digitalWrite_hi(GPIO_port_n, pin)		GPIO_port_n_to_GPIOx(GPIO_port_n)->BSHR = (1 << pin)
+#define GPIO_digitalWrite_lo(GPIO_port_n, pin)		GPIO_port_n_to_GPIOx(GPIO_port_n)->BSHR = (1 << (pin + 16))
 
-static inline uint8_t GPIO_digitalRead(uint32_t pin) {
-	return GPIO_get_pin_PORTX_REG(pin)->INDR >> GPIO_get_pin_N(pin) & 0b1;
-}
+#define GPIO_digitalWrite(GPIO_port_n, pin, lowhigh) ( lowhigh				?	\
+						GPIO_digitalWrite_hi(GPIO_port_n, pin)	:	\
+						GPIO_digitalWrite_lo(GPIO_port_n, pin)	)	\
+
+#define GPIO_digitalRead(GPIO_port_n, pin) 	((GPIO_port_n_to_GPIOx(GPIO_port_n)->INDR >> pin) & 0b1)
 
 
+// 0:7 => 3/9/15/30/43/57/73/241 cycles
+#define GPIO_ADC_set_sampletime(GPIO_analog_input, GPIO_ADC_sampletime) ({	\
+	ADC1->SAMPTR2 &= ~(0b111) << (3 * GPIO_analog_input);			\
+	ADC1->SAMPTR2 |= GPIO_ADC_sampletime << (3 * GPIO_analog_input);	\
+})
+
+#define GPIO_ADC_set_sampletimes_all(GPIO_ADC_sampletime) ({	\
+	ADC1->SAMPTR2 &= 0;					\
+	ADC1->SAMPTR2 |=					\
+			GPIO_ADC_sampletime << (0 * 3)		\
+		|	GPIO_ADC_sampletime << (1 * 3)		\
+		|	GPIO_ADC_sampletime << (2 * 3)		\
+		|	GPIO_ADC_sampletime << (3 * 3)		\
+		|	GPIO_ADC_sampletime << (4 * 3)		\
+		|	GPIO_ADC_sampletime << (5 * 3)		\
+		|	GPIO_ADC_sampletime << (6 * 3)		\
+		|	GPIO_ADC_sampletime << (7 * 3)		\
+		|	GPIO_ADC_sampletime << (8 * 3)		\
+		|	GPIO_ADC_sampletime << (9 * 3);		\
+	ADC1->SAMPTR1 &= 0;					\
+	ADC1->SAMPTR1 |=					\
+			GPIO_ADC_sampletime << (0 * 3)		\
+		|	GPIO_ADC_sampletime << (1 * 3)		\
+		|	GPIO_ADC_sampletime << (2 * 3)		\
+		|	GPIO_ADC_sampletime << (3 * 3)		\
+		|	GPIO_ADC_sampletime << (4 * 3)		\
+		|	GPIO_ADC_sampletime << (5 * 3);		\
+})
+
+
+#define GPIO_ADC_set_power(enable)					\
+	((enable)	?	ADC1->CTLR2 |= ADC_ADON		:	\
+				ADC1->CTLR2 &= ~(ADC_ADON)	)	\
+
+#define GPIO_ADC_calibrate() ({			\
+	ADC1->CTLR2 |= ADC_RSTCAL;		\
+	while(ADC1->CTLR2 & ADC_RSTCAL);	\
+	ADC1->CTLR2 |= ADC_CAL;			\
+	while(ADC1->CTLR2 & ADC_CAL);		\
+})
 
 // large but will likely only ever be called once
 static inline void GPIO_ADCinit() {
@@ -259,9 +264,7 @@ static inline void GPIO_ADCinit() {
 	RCC->APB2PRSTR &= ~RCC_APB2Periph_ADC1;
 
 	// set sampling time for all inputs to 241 cycles
-	for (uint8_t i = GPIO_Ain0_A2; i <= GPIO_AinVcal; i++) {
-		GPIO_ADC_set_sampletime(i, GPIO_ADC_sampletime_241cy_default);
-	}
+	GPIO_ADC_set_sampletimes_all(GPIO_ADC_sampletime);
 
 	// set trigger to software
 	ADC1->CTLR2 |= ADC_EXTSEL;
@@ -273,46 +276,16 @@ static inline void GPIO_ADCinit() {
 
 	// power the ADC
 	GPIO_ADC_set_power(1);
+	GPIO_ADC_calibrate();
 }
 
-static inline void GPIO_ADC_set_sampletime(enum GPIO_analog_inputs input, enum GPIO_ADC_sampletimes time) {
-	// clear
-	ADC1->SAMPTR2 &= ~(0b111)<<(3*input);
-	// set
-	ADC1->SAMPTR2 |= time<<(3*input);	// 0:7 => 3/9/15/30/43/57/73/241 cycles
-}
-
-static inline void GPIO_ADC_set_power(uint8_t enable) {
-	if (enable) {
-		ADC1->CTLR2 |= ADC_ADON;
-		if (enable == 1) {
-			// auto-cal each time after turning on the ADC
-			// can be skipped by calling with enable > 1.
-			GPIO_ADC_calibrate();					
-		}
-	}
-	else {
-		ADC1->CTLR2 &= ~(ADC_ADON);
-	}
-}
-
-static inline void GPIO_ADC_calibrate() {
-	// reset calibration
-	ADC1->CTLR2 |= ADC_RSTCAL;
-	while(ADC1->CTLR2 & ADC_RSTCAL);
-	
-	// calibrate
-	ADC1->CTLR2 |= ADC_CAL;
-	while(ADC1->CTLR2 & ADC_CAL);
-}
 
 static inline uint16_t GPIO_analogRead(enum GPIO_analog_inputs input) {
 	// set mux to selected input
 	ADC1->RSQR3 = input;
 
-	// may need a delay right here for the mux to actually finish switching??
-	// other micro controllers insert a full ms delay right here!
-	
+	Delay_Us(GPIO_ADC_MUX_DELAY);
+
 	// start sw conversion (auto clears)
 	ADC1->CTLR2 |= ADC_SWSTART;
 	
@@ -330,35 +303,6 @@ static inline uint16_t GPIO_analogRead(enum GPIO_analog_inputs input) {
 //######## implementation block
 #define CH32V003_GPIO_ITER_IMPLEMENTATION //enable so LSP can give you text colors while working on the implementation block, disable for normal use of the library
 #if defined(CH32V003_GPIO_ITER_IMPLEMENTATION)
-
-// index to pin
-uint32_t GPIO_pinNumbers_iterable[18] = {
-	GPIO_pin_A1, GPIO_pin_A2,
-	GPIO_pin_C0, GPIO_pin_C1, GPIO_pin_C2, GPIO_pin_C3, GPIO_pin_C4, GPIO_pin_C5, GPIO_pin_C6, GPIO_pin_C7,
-	GPIO_pin_D0, GPIO_pin_D1, GPIO_pin_D2, GPIO_pin_D3, GPIO_pin_D4, GPIO_pin_D5, GPIO_pin_D6, GPIO_pin_D7,
-};
-
-// helper for iterating over the pins
-static inline uint32_t GPIO_from_pinNumber(uint8_t pinNumber) {
-	return GPIO_pinNumbers_iterable[pinNumber];
-}
-
-// can't really think of a better way of finding the port number (0 for A, 1 for C, 2 for D);
-// not strictly used but wouldn't be bad to have
-enum GPIO_ports GPIO_getPort (uint32_t pin) {
-	if (pin <= GPIO_pin_A2) {
-		return GPIO_port_A;
-	}
-	else if (pin <= GPIO_pin_C7) {
-		return GPIO_port_C;
-	}
-	else if (pin <= GPIO_pin_D7) {
-		return GPIO_port_D;
-	}
-	return GPIO_port_none;
-}
-// con't solve it with a #define (/1024 or /2048) either because of nonexistent GPIOB in between!
-// please improve it if you know how!
 
 
 

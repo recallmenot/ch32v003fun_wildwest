@@ -100,8 +100,14 @@ Symptoms of bad contact:
 
 The library relies on SysTick and provides an EXTI0_7 ISR.
 For measurement stability, temproraily all other programmable interrupts will be halted and interrupt priority will be temporarily elevated.
-A `while(pin_is_high)`-loop produces far greater output value jitter, even in combination with `__disable_irq()`.
+Elevating priority of the interrupt of interest resulted in second-best jitter improvement:
+	// elevate EXT7_0 interrupt priority
+	NVIC_SetPriority(EXTI7_0_IRQn, ((1<<7) | (0<<6) | (1<<4)));
+	// restore EXT7_0 interrupt priority to normal level
+	NVIC_SetPriority(EXTI7_0_IRQn, 0);
+A `while(pin_is_high)`-loop produces the worst output value jitter, even in combination with `__disable_irq()`.
 __WFI into sleep (core clock halted) takes far too long to wake up.
+altering priotrity did no
 Total measurement time is only 100 ticks without finger and 240 with finger ( 16.67 .. 40 µs).
 A delay function that has the ability to exit early when the interrupt raises a flag was tested but too slow.
 
@@ -270,9 +276,8 @@ static inline uint16_t captouch_sense(GPIO_TypeDef* port, uint8_t pin) {
 	volatile uint32_t t_pull;
 	// disable all IRQs besides EXTI7_0
 	uint32_t IRQ_backup = NVIC_get_enabled_IRQs();
+	NVIC_EnableIRQ(EXTI7_0_IRQn);
 	NVIC_clear_all_IRQs_except(EXTI7_0_IRQn);
-	// elevate EXT7_0 interrupt priority
-	//NVIC_SetPriority(EXTI7_0_IRQn, ((1<<7) | (0<<6) | (1<<4)));
 	// register pin for pin change interrupt
 	EXTI->INTENR |= 1 << pin;
 	// let external pulldown resistor slowly discharge pin by turning it into a Hi-Z input
@@ -287,8 +292,6 @@ static inline uint16_t captouch_sense(GPIO_TypeDef* port, uint8_t pin) {
 	NVIC_restore_IRQs(IRQ_backup);
 	// register pin for pin change interrupt
 	EXTI->INTENR &= ~(1 << pin);
-	// restore EXT7_0 interrupt priority to normal level
-	//NVIC_SetPriority(EXTI7_0_IRQn, 0);
 	// recharge pin for next time
 	captouch_cfg_pin_charge(port, pin);
 	// calculate time to discharge
