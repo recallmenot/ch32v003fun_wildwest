@@ -1,32 +1,27 @@
-// based on https://paste.sr.ht/blob/b9b4fb45cbc70f2db7e31a77a6ef7dd2a7f220fb
-// Could be defined here, or in the processor defines.
-#define SYSTEM_CORE_CLOCK 48000000
+// DEMO CONFIGURATION
 
-#include "../../ch32v003fun/ch32v003fun.h"
-
-#define SELECT_BUTTONS 0
-#define SELECT_SLIDER2 0
-#define SELECT_SLIDER3 1
-
-#if (((SELECT_BUTTONS < 1) && (SELECT_SLIDER2 < 1) && (SELECT_SLIDER3 < 1)) || ((SELECT_BUTTONS + SELECT_SLIDER2 + SELECT_SLIDER3) > 1))
-#error "please enable one of the demos"
-#endif
-
-#define CAPTOUCH_PUSHPULL_PORT GPIOC
-#define CAPTOUCH_PUSHPULL_PIN 7
-#define CAPTOUCH_SENSE_N_LINES 3
-#define CAPTOUCH_SENSE_PORT_L2 GPIOD
-#define CAPTOUCH_SENSE_PORT_L5 GPIOC
-#define CAPTOUCH_SENSE_PORT_L6 GPIOC
-#include "ch32v003_captouch.h"
+// use the sensing surfaces either as 3 buttons or a slider (set 1 and 0 to select)
+#define DEMO_SELECT_BUTTONS	0
+#define DEMO_SELECT_SLIDER	1
 
 // here you can flip the timer polarity to suit your LED connection
 // set to 1 if PD4 is connected to LED cathode (-), 0 if PD4 is connected to LED anode (+)
-#define LED_CATHODE_ON_PIN 0
+#define LED_CATHODE_ON_PIN	0
+
+
+
+#if ((DEMO_SELECT_BUTTONS < 1) && (DEMO_SELECT_SLIDER < 1))
+#error "please enable one of the DEMOS"
+#endif
+
+
+
+#define SYSTEM_CORE_CLOCK 48000000
+#define APB_CLOCK SYSTEM_CORE_CLOCK
+
+#include "../../ch32v003fun/ch32v003fun.h"
 
 #include <stdio.h>
-
-#define APB_CLOCK SYSTEM_CORE_CLOCK
 
 #define LOG_LVL 1
 #if LOG_LVL >= 1
@@ -35,14 +30,21 @@
 #define LOG(...)
 #endif
 
+#define CAPTOUCH_SENSE_PORT_L2 GPIOD
+#define CAPTOUCH_SENSE_PORT_L5 GPIOC
+#define CAPTOUCH_SENSE_PORT_L6 GPIOC
+#define CAPTOUCH_SENSE_THRESHOLD 5
+#define CAPTOUCH_BTN_CONTACT_THRESHOLD 30
+#define CAPTOUCH_SLIDER_CONTACT_THRESHOLD 30
+#include "ch32v003_captouch.h"
+
+
+
 //#define SCHD_sense_i 967 * DELAY_US_TIME
 //#define SCHD_sense_i 2141 * DELAY_US_TIME
 #define SCHD_sense_i 373 * DELAY_US_TIME
-#define SCHD_led_i 809 * DELAY_US_TIME
 #define SCHD_log_i 73 * DELAY_MS_TIME
 
-/* somehow this ISR won't get called??
-*/
 
 
 void t2pwm_init( void )
@@ -110,7 +112,7 @@ int main()
 	SetupUART( UART_BRR );
 	#endif
 
-	//printf("\r\n\r\nlow power example\r\n\r\n");
+	printf("\r\n\r\ncapTouch TM (C) patent pending rights reserved\r\n\r\n");
 
 	RCC->APB2PCENR |= RCC_APB2Periph_GPIOD;
 	RCC->APB2PCENR |= RCC_APB2Periph_GPIOC;
@@ -121,27 +123,26 @@ int main()
 	// GPIO C4 Push-Pull
 	GPIOC->CFGLR &= ~(0xf<<(4*4));
 	GPIOC->CFGLR |= (GPIO_Speed_10MHz | GPIO_CNF_OUT_PP)<<(4*4);
-	GPIOC->BSHR = (1 << 4);
-
-	// give the user time to open the terminal connection
-	Delay_Ms(2000);
-	LOG("3000ms wait over\r\n");
-
-	//captouch_assign_pushpull();
-	captouch_assign_sense();
-
-	printf("EXTI7_0 priotirty is %x\r\n", NVIC->IPRIOR[EXTI7_0_IRQn]);
 
 	GPIOC->OUTDR |= (1 << 3);
 
+	captouch_assign_sense();
+
+	// give the user time to open the terminal connection
+	Delay_Ms(2000);
+
+
+	GPIOC->BSHR = (1 << 4);
+	printf("EXTI7_0 priotirty is %x\r\n", NVIC->IPRIOR[EXTI7_0_IRQn]);
+
+
 	//uint16_t counter = 0;
-	LOG("entering captouch loop\r\n");
-	GPIOC->BSHR = (1 << (16 + 4));
 
 	uint8_t result_line6;
 	uint8_t result_line5;
 	uint8_t result_line2;
 
+	LOG("CAL in 2000ms\r\n");
 	uint8_t cal_line6 = captouch_sense(CAPTOUCH_SENSE_PORT_L6, 6);
 	Delay_Ms(1);
 	uint8_t cal_line5 = captouch_sense(CAPTOUCH_SENSE_PORT_L5, 5);
@@ -150,24 +151,19 @@ int main()
 
 	LOG("%03u %03u %03u cal\r\n", cal_line6, cal_line5, cal_line2);
 	Delay_Ms(2000);
+	GPIOC->BSHR = (1 << (16 + 4));
 
 	uint8_t slider_output = 0;
-	uint8_t slider_pre_output = 0;
 	int16_t slider_memory;
 
 	uint8_t schd_sense_step = 0;
-	uint8_t schd_led_step = 0;
-
-	uint32_t schd_led_i = SCHD_led_i;
 
 	uint32_t schd_sense_t = 0;
-	uint32_t schd_led_t = 0;
 	uint32_t schd_log_t = 0;
-	uint32_t led_ctrl_t0 = 0;
-	uint32_t led_ctrl_t1 = 0;
+	LOG("entering capTouch TM (C) patent pending rights reserved loop\r\n");
 	for (;;) {
 		if (SysTick->CNT - schd_sense_t > SCHD_sense_i) {
-			#if SELECT_SLIDER2 == 1
+			#if DEMO_SELECT_BUTTONS == 1
 			switch (schd_sense_step) {
 				case 0:
 					//result_line6 = captouch_sense_pin(6);
@@ -193,43 +189,10 @@ int main()
 					break;
 			}
 			#endif
-			#if SELECT_SLIDER3 == 1
-			/*
-			switch (schd_sense_step) {
-				case 0:
-					//result_line6 = captouch_sense_pin(6);
-					result_line6 = captouch_value_clean(captouch_sense(CAPTOUCH_SENSE_PORT_L6, 6), cal_line6, 8);
-					//captouch_filter(&result_line6, captouch_value_clean(captouch_sense_pin(6), cal_line6, 3));
-					schd_sense_step++;
-					break;
-				case 1:
-					result_line5 = captouch_value_clean(captouch_sense(CAPTOUCH_SENSE_PORT_L5, 5), cal_line5, 8);
-					schd_sense_step++;
-					break;
-				case 2:
-					//result_line2 = captouch_sense_pin(2);
-					result_line2 = captouch_value_clean(captouch_sense(CAPTOUCH_SENSE_PORT_L2, 2), cal_line2, 8);
-					//captouch_filter(&result_line2, captouch_value_clean(captouch_sense_pin(2), cal_line2, 3));
-					schd_sense_step++;
-					break;
-				case 3:
-					slider_output = captouch_slider3(result_line6, result_line5, result_line2, 30);
-					//slider_output = captouch_discretize(slider_output, 3);
-					schd_sense_step++;
-					break;
-				case 4:
-					led_ctrl_t0 = (slider_output >> 2) * DELAY_US_TIME;		// on-time
-					led_ctrl_t1 = ((255 - slider_output) >> 2) * DELAY_US_TIME;	// off-time
-					schd_sense_step = 0;
-					break;
-				default:
-					break;
-			}
-			*/
+			#if DEMO_SELECT_SLIDER == 1
+			// with switch case here, 5 statements = 2600 bytes, 6 statements = 18000 bytes! maybe gcc12 bug? -> replaced with if else (works)
 			if (schd_sense_step == 0) {
-				//result_line6 = captouch_sense_pin(6);
 				result_line6 = captouch_value_clean(captouch_sense(CAPTOUCH_SENSE_PORT_L6, 6), cal_line6, 4);
-				//captouch_filter(&result_line6, captouch_value_clean(captouch_sense_pin(6), cal_line6, 3));
 				schd_sense_step++;
 
 			}
@@ -239,53 +202,27 @@ int main()
 
 			}
 			else if (schd_sense_step == 2) {
-				//result_line2 = captouch_sense_pin(2);
 				result_line2 = captouch_value_clean(captouch_sense(CAPTOUCH_SENSE_PORT_L2, 2), cal_line2, 4);
-				//captouch_filter(&result_line2, captouch_value_clean(captouch_sense_pin(2), cal_line2, 3));
 				schd_sense_step++;
 
 			}
 			else if (schd_sense_step == 3) {
-				//slider_output = captouch_slider3(result_line6, result_line5, result_line2, 30);
-				captouch_slider3_scroll(result_line6, result_line5, result_line2, 30, &slider_output, &slider_memory, 8, 1);
-				//slider_output = captouch_discretize(slider_output, 3);
-				
+				captouch_slider3_scroll(result_line6, result_line5, result_line2, &slider_output, &slider_memory, 8, 1);
 				schd_sense_step++;
 
 			}
 			else if (schd_sense_step >= 4) {
-				//captouch_filter(&slider_output, slider_pre_output);
 				t2pwm_setpw(0, slider_output);
 				schd_sense_step = 0;
 			}
 			#endif
 			schd_sense_t = SysTick->CNT;
 		}
-		/*
-		if (SysTick->CNT - schd_led_t > schd_led_i) {
-			switch (schd_led_step) {
-				case 0:
-					if (led_ctrl_t0) {
-						GPIOC->BSHR = 1 << 3;
-					}
-					schd_led_i = led_ctrl_t0;
-					schd_led_step++;
-					break;
-				case 1:
-					GPIOC->BSHR = 1 << (3 + 16);
-					schd_led_i = led_ctrl_t1;
-					schd_led_step = 0;
-					break;
-
-			}
-			schd_led_t = SysTick->CNT;
-		}
-		*/
 		if (SysTick->CNT - schd_log_t > SCHD_log_i) {
-			#if SELECT_SLIDER2 == 1
-			LOG("%03u %03u %03u\r\n", result_line6, result_line5, slider_output);
+			#if DEMO_SELECT_BUTTONS == 1
+			LOG("%03u %03u %03u\r\n", result_line6, result_line5, result_line2);
 			#endif
-			#if SELECT_SLIDER3 == 1
+			#if DEMO_SELECT_SLIDER == 1
 			LOG("%03u %03u %03u %03u\r\n", result_line6, result_line5, result_line2, slider_output);
 			#endif
 			GPIOD->OUTDR ^= (1 << 4);

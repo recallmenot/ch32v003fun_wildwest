@@ -1,4 +1,4 @@
-# CapTouch!!!
+# capTouch TM (C) patent pending rights reserved
 Our favorite victim of software abuse now gained the ability to sense capacitive touch!  
 The library provides for reading from single pins, which you can use for buttons, as a slider or even as a scrolling slider!  
 
@@ -48,4 +48,4 @@ Symptoms of bad contact:
 
 Connect the capacitive sensing plates to each sense pin (C6, C5, D2).
 Connect each sense pin to GND through its own large resistor (>=1 megaohm).
-LEDs (with current limiting resistors) can be connected to C3 (status) and D4 (PWM).
+LEDs (with current limiting resistors) can be connected to C4 (status) and D4 (PWM).
