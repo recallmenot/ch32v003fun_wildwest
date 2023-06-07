@@ -11,25 +11,35 @@
 
 
 /*######## library description
+This library derives well-behaved button states from digital and analog sources.
 
+The only thing that makes it specific to CH32V003 is the use of SysTick for retrieving the current time.
 
 */
 
 
 /*######## library usage and configuration
+BTNi_interpret_state takes in a digital button signal (1 for pressed, 0 for open) and requires memory for time and state.
 
+The output is the state memory, "encoded" as BTNi_states.
 
+Your program only needs to call BTNi_interpret_state (~ 1 ms recommended) and then perform the desired action when the state memory holds your desired state.
+
+BTNi_analog_threshold may be used to apply a threshold to an analog value, the result returned is digital.
 */
+
 
 
 /*######## requirements: configure before #including this library!
 Before #including this library, you will need to configure your desired timings in Ticks.
-Ticks_from_Ms(n) can be used for the conversion.
+Ticks_from_Ms(n) may be used for the conversion.
 
 #define BTNi_i_DEBOUNCE		Ticks_from_Ms(10)
 #define BTNi_i_HOLD		Ticks_from_Ms(1000)
 #define BTNi_i_HOLD_REPEAT	Ticks_from_Ms(250)
 */
+
+
 
 //######## button states: use the ones with comments in your program!
 
@@ -47,10 +57,11 @@ enum BTNi_states {
 
 //######## function overview (declarations): use these!
 
+#define BTNi_analog_threshold(input, threshold)
 
-enum BTNi_states BTNi_interpret_state(uint8_t button_pressed, uint32_t* time_memory, uint8_t* state_memory );
+void BTNi_interpret_state(const uint8_t button_pressed, uint32_t* time_memory, uint8_t* state_memory );
 
-#define BTNi_analog_threshold(input, threshold) (input > analog_threshold ? 1 : 0)
+
 
 //######## internal function declarations
 
@@ -78,7 +89,10 @@ enum BTNi_states BTNi_interpret_state(uint8_t button_pressed, uint32_t* time_mem
 //######## small function definitions, static inline
 
 
-enum BTNi_states BTNi_interpret_state(uint8_t button_pressed, uint32_t* time_memory, uint8_t* state_memory ) {
+#undef BTNi_analog_threshold
+#define BTNi_analog_threshold(input, threshold) (input > threshold ? 1 : 0)
+
+void BTNi_interpret_state(const uint8_t button_pressed, uint32_t* time_memory, uint8_t* state_memory ) {
 	if (button_pressed) {
 		switch (*state_memory) {
 			case BTNi_state_open:
@@ -93,7 +107,7 @@ enum BTNi_states BTNi_interpret_state(uint8_t button_pressed, uint32_t* time_mem
 			case BTNi_state_pushed:
 				*time_memory = SysTick->CNT;
 				*state_memory = BTNi_state_wait_for_hold;
-				return BTNi_state_pushed;
+				//return BTNi_state_pushed;
 				break;
 			case BTNi_state_wait_for_hold:
 				if (SysTick->CNT - *time_memory > BTNi_i_HOLD) {
@@ -108,19 +122,17 @@ enum BTNi_states BTNi_interpret_state(uint8_t button_pressed, uint32_t* time_mem
 			case BTNi_state_held:
 				*time_memory = SysTick->CNT;
 				*state_memory = BTNi_state_wait_for_hold_repeat;
-				return BTNi_state_held;
+				//return BTNi_state_held;
 				break;
 		}
 	}
 	else {
 		*state_memory = BTNi_state_open;
-		return BTNi_state_open;
+		//return BTNi_state_open;
 	}
-	return BTNi_state_open;
+	//return BTNi_state_open;
 }
-// hide functionalities behind the interval defines?
-// double-press needs upstroke detection?
-
+// double-press requires upstroke detection?
 
 
 //######## small internal function definitions, static inline

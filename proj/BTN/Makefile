@@ -1,6 +1,6 @@
 all : flash
 
-TARGET:=GPIO
+TARGET:=BTN
 
 CFLAGS+=-DTINYVECTOR
 

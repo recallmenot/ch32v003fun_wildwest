@@ -48,4 +48,26 @@ Symptoms of bad contact:
 
 Connect the capacitive sensing plates to each sense pin (C6, C5, D2).
 Connect each sense pin to GND through its own large resistor (>=1 megaohm).
-LEDs (with current limiting resistors) can be connected to C4 (status) and D4 (PWM).
+LEDs (with current limiting resistors, 1k is default recommendation) can be connected to C4 (cal) and D4 (PWM).
+
+## demos
+
+You may choose between a button demo and a slider demo by setting the desired define to 1 and the other to 0.
+
+The LED on C4 signals to remove the finger from the vicinity of the sensing plates before / during calibration.
+
+### button demo
+
+Here, the 3 sense plates are interpreted as buttons.
+
+|              | C6        | C5         | D2         |
+|--------------|-----------|------------|------------|
+| press        | -8        |            | +8         |
+| hold         | -128      | 0          | +128       |
+
+Tap / hold to make the values & brightness change!
+
+### slider scroll demo
+
+The 3 sense plates have their shape because they're intended to be used for a slider.
+Just drag your fingers across and watch the values & bringthness change!
