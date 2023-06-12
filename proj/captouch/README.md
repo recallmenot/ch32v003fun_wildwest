@@ -1,5 +1,8 @@
 # capTouch TM (C) patent pending rights reserved
 Our favorite victim of software abuse now gained the ability to sense capacitive touch!  
+
+https://github.com/recallmenot/ch32v003fun_wildwest/assets/104343143/4cc7485d-70f7-4025-b123-ec1294ca7ce2
+
 The library provides for reading from single pins, which you can use for buttons, as a slider or even as a scrolling slider!  
 
 ## working principle
