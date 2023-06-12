@@ -1,22 +1,14 @@
-# one GPIO libaray to rule them all
+# HSV control for RGB LEDs
 
-This Arduino-like GPIO library offers
- * digital IO
- * analog-to-digital
- * digital-to-analog (PWM)
+This library + example provide the ability to generate 8 and 10 bit RGB data from HSV and display it on an RGB led, using PWM.
 
-Great care has been taken to make the resulting code as fast and tiny as possible. Let the compiler suffer!  
-Hand-written blink compiles to 500 bytes, blink using this library compiles to 504 bytes!  
+`colorm_spectrum` and `colorm_rainbow` originate from the [FastLED library](https://github.com/FastLED/FastLED/tree/master).
 
-# GPIO Example
+# RGB example
 
-Connect LED + 1k resistor to each LED pin (C0 to C7 and D4) and GND.  
-Connect a button to GND and D3.  
-Connect a 10k pot between GND and VCC, wiper to D6.  
+Connect red to D4, green to D3 and blue to C0.
+Calibrate the the whitepoint by selecting the right resisors as described in colormath.h color adjustments section.
+For reference, with my specific RGB led, at 3.3V, I chose 56, 330 and 470 Ohm.
+You will likely need different values.
 
-The desired demo may be selected in GPIO.c by setting it to 1 and the others to 0.  
-Marvel at the colorful glory.  
-
-
-
-https://github.com/recallmenot/ch32v003fun/assets/104343143/afb4027d-a609-467a-96c5-0cc3283366a4
+The desired demo may be selected in colors.c by setting it to 1 and the others to 0.  
