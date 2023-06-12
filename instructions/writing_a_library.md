@@ -1,5 +1,4 @@
 # writing a library
-translation unit = .c file
 
 ## principles
 we want the compiler to do all the work it can, including
@@ -9,7 +8,10 @@ we want the compiler to do all the work it can, including
 	*	-> compiler won't bring expensive math functions onto our tiny mcu
 
 ## header-only libraries with optional implementation and static inlinig
-This is the structural concept to which we write libraries for the CH32V003.
+This is the structural concept to which we write libraries for the CH32V003.  
+
+As the compiler treats each .c file as a separate "program" until they are linked together for function calls. These are called translation units (= .c file).  
+To circumvent this separation, we write header-only libraries.
 
 ### benefits
 Compared to traditional .h declaration and .c implementation files, the approach offers the following benefits:
@@ -54,7 +56,7 @@ int large_function(int a, int b, int c) {
 #endif // LIBRARY_IMPLEMENTATION
 #endif // MY_LIBRARY_H
 ```
-You can find a more elaborate structure in `ch32v003_library_template.h`, please use it when writing libraries.
+You can find a more elaborate structure in [ch32v003_library_template.h](https://github.com/recallmenot/ch32v003fun_wildwest/blob/main/contribute/templates/ch32v003_library.h), please use it when writing libraries.
 
 to access functions of implementation block in .c file:
 ```

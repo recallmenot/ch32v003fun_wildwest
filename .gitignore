@@ -10,3 +10,5 @@ extralibs
 minichlink
 examples
 compile_commands.json
+.clangd
+.cache
