@@ -1,8 +1,7 @@
 all : flash
 
-TARGET:=GPIO_analogRead
+TARGET:=captouch
 
-CFLAGS+=-DTINYVECTOR
 CFLAGS+=-DSTDOUT_UART
 
 include ../../ch32v003fun/ch32v003fun.mk

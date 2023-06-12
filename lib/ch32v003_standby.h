@@ -80,7 +80,7 @@ static inline void standby_gpio_init();
 // configure GPIO pin for wakeup
 static inline void standby_gpio_assign_pin(uint8_t standby_gpio_port, uint8_t pin_number, uint8_t standby_trigger_direction);
 // configure GPIO pin with pull-up for wakeup
-static inline void standby_gpio_assign_button(uint8_t standby_gpio_port, uint8_t pin_number);
+static inline void standby_gpio_assign_button(GPIO_TypeDef* gpio_port, uint8_t pin_number);
 
 // enter standby mode
 static inline void standby_enter();
@@ -96,13 +96,6 @@ static inline void standby_enter();
 
 
 //######## preprocessor macros
-
-#define STANDBY_GPIO_REGISTER_BASE_I	1024
-#define STANDBY_GPIO_CFGLR_OFFSET	0x00
-#define STANDBY_GPIO_OUTDR_OFFSET	0x0C
-#define STANDBY_GPIO_BSHR_OFFSET	0x10
-#define STANDBY_TRIGGER_RISING_OSSFET	0x08
-#define STANDBY_TRIGGER_FALLING_OSSFET	0x0C
 
 
 
@@ -172,19 +165,17 @@ static inline void standby_gpio_assign_pin(uint8_t standby_gpio_port, uint8_t pi
 	EXTI->EVENR |= (1 << pin_number);
 
 	// set trigger condition
-	*(uint32_t*)(uintptr_t)(EXTI_BASE + STANDBY_TRIGGER_RISING_OSSFET) |= (standby_trigger_direction & 0b01) * (1 << pin_number);
-	*(uint32_t*)(uintptr_t)(EXTI_BASE + STANDBY_TRIGGER_FALLING_OSSFET) |= (standby_trigger_direction >> 1) * (1 << pin_number);
+	EXTI->RTENR |= (standby_trigger_direction & 0b01) * (1 << pin_number);
+	EXTI->FTENR |= (standby_trigger_direction >> 1) * (1 << pin_number);
 }
 
 
 
-static inline void standby_gpio_assign_button(uint8_t standby_gpio_port, uint8_t pin_number) {
+static inline void standby_gpio_assign_button(GPIO_TypeDef* gpio_port, uint8_t pin_number) {
 	// configure button as input, pullup
-	*(uint32_t*)(uintptr_t)(GPIOA_BASE + (STANDBY_GPIO_REGISTER_BASE_I *standby_gpio_port) + STANDBY_GPIO_CFGLR_OFFSET) &= ~(0xf << (pin_number * 4));
-	*(uint32_t*)(uintptr_t)(GPIOA_BASE + (STANDBY_GPIO_REGISTER_BASE_I *standby_gpio_port) + STANDBY_GPIO_CFGLR_OFFSET) |= (GPIO_CNF_IN_PUPD) << (pin_number * 4);
-	*(uint32_t*)(uintptr_t)(GPIOA_BASE + (STANDBY_GPIO_REGISTER_BASE_I * standby_gpio_port) + STANDBY_GPIO_BSHR_OFFSET) = (1 << pin_number);
-
-	standby_gpio_assign_pin(standby_gpio_port, pin_number, STANDBY_TRIGGER_DIRECTION_FALLING);
+	gpio_port->CFGLR &= ~(0xf << (pin_number * 4));
+	gpio_port->CFGLR |= (GPIO_CNF_IN_PUPD) << (pin_number * 4);
+	gpio_port->BSHR = (1 << pin_number);
 }
 
 
