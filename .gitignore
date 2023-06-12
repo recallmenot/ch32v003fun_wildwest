@@ -9,3 +9,6 @@ ch32v003fun
 extralibs
 minichlink
 examples
+compile_commands.json
+.clangd
+.cache
